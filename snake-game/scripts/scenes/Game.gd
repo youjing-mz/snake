@@ -12,6 +12,11 @@ extends Node2D
 @onready var food: Food
 @onready var game_ui: GameUI
 
+# AI系统引用
+var ai_player: AIPlayer
+var ai_snake: Snake
+var ai_debug_visualizer: AIDebugVisualizer
+
 # 管理器引用
 var game_manager: GameManager
 var scene_manager: SceneManager
@@ -20,6 +25,8 @@ var save_manager: SaveManager
 # 游戏状态
 var is_initialized: bool = false
 var game_area_rect: Rect2
+var is_ai_battle_mode: bool = false
+var ai_config: Dictionary = {}
 
 func _ready() -> void:
 	# 设置节点组
@@ -40,10 +47,13 @@ func _ready() -> void:
 	# 连接信号
 	_connect_signals()
 	
+	# 检查游戏模式
+	_check_game_mode()
+	
 	# 标记为已初始化
 	is_initialized = true
 	
-	print("Game scene initialized")
+	print("Game scene initialized - Mode: ", "AI Battle" if is_ai_battle_mode else "Single Player")
 	
 	# 应用保存的设置
 	_apply_saved_settings()
@@ -189,6 +199,15 @@ func _on_game_paused() -> void:
 		snake.set_paused(true)
 	if food:
 		food.set_paused(true)
+	
+	# 暂停AI蛇移动
+	var ai_move_timer = find_child("AIMoveTimer")
+	if ai_move_timer:
+		ai_move_timer.stop()
+	
+	# 暂停AI决策
+	if ai_player:
+		ai_player.set_paused(true)
 
 ## 游戏恢复信号处理
 func _on_game_resumed() -> void:
@@ -199,10 +218,28 @@ func _on_game_resumed() -> void:
 		snake.set_paused(false)
 	if food:
 		food.set_paused(false)
+	
+	# 恢复AI蛇移动
+	var ai_move_timer = find_child("AIMoveTimer")
+	if ai_move_timer:
+		ai_move_timer.start()
+	
+	# 恢复AI决策
+	if ai_player:
+		ai_player.set_paused(false)
 
 ## 游戏结束信号处理
 func _on_game_over(final_score: int) -> void:
 	print("Game over with score: ", final_score)
+	
+	# 停止AI蛇移动
+	var ai_move_timer = find_child("AIMoveTimer")
+	if ai_move_timer:
+		ai_move_timer.stop()
+	
+	# 停止AI决策
+	if ai_player:
+		ai_player.stop_ai()
 	
 	# 播放游戏结束效果
 	_play_game_over_effects()
@@ -238,6 +275,10 @@ func _reset_game_objects() -> void:
 	# 重置UI
 	if game_ui:
 		game_ui.reset_ui()
+	
+	# 重新初始化AI系统（如果是AI模式）
+	if is_ai_battle_mode:
+		_reinitialize_ai_system()
 
 ## 播放游戏结束效果
 func _play_game_over_effects() -> void:
@@ -439,4 +480,289 @@ func get_game_stats() -> Dictionary:
 	if snake:
 		stats["snake_length"] = snake.get_length()
 	
+	# 添加AI统计信息
+	if is_ai_battle_mode and ai_player:
+		stats["ai_stats"] = ai_player.get_ai_stats()
+	
 	return stats
+
+## 检查游戏模式
+func _check_game_mode() -> void:
+	if save_manager:
+		var game_mode = save_manager.get_setting("game_mode", "single_player")
+		is_ai_battle_mode = (game_mode == "ai_battle")
+		
+		if is_ai_battle_mode:
+			# 获取AI配置
+			ai_config = {
+				"difficulty": save_manager.get_setting("ai_difficulty", 1),
+				"debug_enabled": save_manager.get_setting("ai_debug_enabled", false)
+			}
+			
+			# 创建AI系统
+			_create_ai_system()
+
+## 创建AI系统
+func _create_ai_system() -> void:
+	if not is_ai_battle_mode:
+		return
+	
+	print("Creating AI system with config: ", ai_config)
+	
+	# 创建AI蛇
+	_create_ai_snake()
+	
+	# 创建AI玩家
+	_create_ai_player()
+	
+	# 创建AI调试可视化器（如果启用）
+	if ai_config.get("debug_enabled", false):
+		_create_ai_debug_visualizer()
+
+## 创建AI蛇
+func _create_ai_snake() -> void:
+	ai_snake = Snake.new()
+	ai_snake.name = "AISnake"
+	ai_snake.add_to_group("ai_snake")
+	
+	# 设置AI蛇的起始位置（与玩家蛇不同）
+	var grid_size = Constants.get_current_grid_size()
+	var ai_start_pos = Vector2(grid_size.x - 5, int(grid_size.y / 2))  # 右侧中央
+	
+	# 设置AI蛇的外观（不同颜色）
+	ai_snake.snake_color = GameColors.ACCENT_RED  # 红色AI蛇
+	
+	# 直接添加到游戏场景
+	add_child(ai_snake)
+	
+	# 初始化AI蛇（在添加到场景后）
+	ai_snake.initialize_snake(ai_start_pos, Vector2.LEFT)  # 向左移动
+	
+	# 设置AI蛇的位置到游戏区域
+	ai_snake.position = game_area_rect.position
+	
+	# 确保AI蛇可见且在最上层
+	ai_snake.visible = true
+	ai_snake.z_index = 10  # 确保在其他元素之上
+	
+	# 强制更新视觉显示
+	ai_snake.update_display()
+	
+	print("AI snake created at position: ", ai_start_pos)
+	print("AI snake added to scene, visible: ", ai_snake.visible)
+	print("AI snake world position: ", ai_snake.position)
+	print("AI snake z_index: ", ai_snake.z_index)
+	print("AI snake color: ", ai_snake.snake_color)
+
+## 创建AI玩家
+func _create_ai_player() -> void:
+	ai_player = AIPlayer.new()
+	ai_player.name = "AIPlayer"
+	
+	# 设置AI难度
+	var difficulty = ai_config.get("difficulty", 1)
+	ai_player.set_difficulty(difficulty)
+	
+	# 连接AI信号
+	ai_player.ai_decision_made.connect(_on_ai_decision_made)
+	ai_player.ai_died.connect(_on_ai_died)
+	ai_player.ai_stats_updated.connect(_on_ai_stats_updated)
+	
+	# 启动AI
+	ai_player.start_ai(ai_snake)
+	
+	# 添加到场景
+	add_child(ai_player)
+	
+	# 创建AI蛇的移动计时器
+	_create_ai_move_timer()
+	
+	print("AI player created with difficulty: ", AIPlayer.Difficulty.keys()[difficulty])
+
+## 创建AI移动计时器
+func _create_ai_move_timer() -> void:
+	if not ai_snake:
+		return
+	
+	# 创建AI蛇的移动计时器
+	var ai_move_timer = Timer.new()
+	ai_move_timer.name = "AIMoveTimer"
+	ai_move_timer.wait_time = 1.0 / Constants.BASE_MOVE_SPEED  # 与玩家蛇相同的速度
+	ai_move_timer.timeout.connect(_on_ai_move_timer_timeout)
+	ai_move_timer.autostart = true
+	add_child(ai_move_timer)
+	
+	print("AI move timer created with interval: ", ai_move_timer.wait_time)
+
+## AI移动计时器回调
+func _on_ai_move_timer_timeout() -> void:
+	if not ai_snake or not ai_snake.is_snake_alive():
+		return
+	
+	# 移动AI蛇
+	ai_snake.move()
+	
+	# 检查AI蛇的碰撞
+	_check_ai_collisions()
+	
+	# 调试信息：打印AI蛇位置
+	if ai_snake and ai_snake.get_body_positions().size() > 0:
+		var head_pos = ai_snake.get_head_position()
+		print("AI snake moved to: ", head_pos, " direction: ", ai_snake.get_direction())
+
+## 检查AI蛇碰撞
+func _check_ai_collisions() -> void:
+	if not ai_snake or not grid:
+		return
+	
+	# 使用CollisionDetector进行综合碰撞检测
+	var collision_result = CollisionDetector.detect_collision(
+		ai_snake.get_head_position(),
+		ai_snake.get_body_positions(),
+		food.get_current_position() if food else Vector2(-1, -1),
+		food.is_active() if food else false,
+		grid.grid_width,
+		grid.grid_height
+	)
+	
+	match collision_result:
+		CollisionDetector.CollisionType.WALL:
+			print("AI snake hit wall")
+			ai_snake.kill()
+			if ai_player:
+				ai_player.stop_ai()
+			return
+		CollisionDetector.CollisionType.SELF:
+			print("AI snake hit itself")
+			ai_snake.kill()
+			if ai_player:
+				ai_player.stop_ai()
+			return
+		CollisionDetector.CollisionType.FOOD:
+			_handle_ai_food_eaten()
+			return
+		CollisionDetector.CollisionType.NONE:
+			# 无碰撞，继续游戏
+			pass
+
+## 处理AI蛇吃食物
+func _handle_ai_food_eaten() -> void:
+	if not ai_snake or not food:
+		return
+	
+	# 获取食物价值
+	var food_value = food.get_current_value()
+	
+	# 消费食物
+	food.consume_food()
+	
+	# AI蛇增长
+	ai_snake.grow()
+	
+	# 更新AI分数
+	if ai_player:
+		ai_player.update_score(food_value)
+	
+	# 生成新食物
+	if food:
+		food.spawn_food(snake.get_body_positions() + ai_snake.get_body_positions())
+
+## 创建AI调试可视化器
+func _create_ai_debug_visualizer() -> void:
+	ai_debug_visualizer = AIDebugVisualizer.new()
+	ai_debug_visualizer.name = "AIDebugVisualizer"
+	
+	# 设置AI玩家引用
+	ai_debug_visualizer.set_ai_player(ai_player)
+	
+	# 设置位置到游戏区域
+	ai_debug_visualizer.position = game_area_rect.position
+	
+	# 启用调试可视化
+	ai_debug_visualizer.toggle_debug_visualization()
+	
+	# 设置可视化选项
+	ai_debug_visualizer.set_visualization_options({
+		"show_path": true,
+		"show_safety_zones": true,
+		"show_decision_scores": true,
+		"show_thinking_process": true
+	})
+	
+	# 添加到场景
+	add_child(ai_debug_visualizer)
+	
+	print("AI debug visualizer created and enabled")
+	print("AI debug visualizer position: ", ai_debug_visualizer.position)
+	print("AI debug visualizer visible: ", ai_debug_visualizer.visible)
+
+## AI决策信号处理
+func _on_ai_decision_made(direction: Vector2, reasoning: String) -> void:
+	print("AI decided to move: ", direction, " - ", reasoning)
+
+## AI死亡信号处理
+func _on_ai_died(survival_time: float, score: int) -> void:
+	print("AI died after ", survival_time, " seconds with score ", score)
+	
+	# 可以在这里处理AI死亡后的逻辑，比如宣布玩家获胜
+	if game_ui and game_ui.has_method("show_ai_defeat_message"):
+		game_ui.show_ai_defeat_message(survival_time, score)
+
+## AI统计更新信号处理
+func _on_ai_stats_updated(stats: Dictionary) -> void:
+	# 可以在这里更新UI显示AI统计信息
+	pass
+
+## 处理输入（添加AI调试控制）
+func _unhandled_input(event: InputEvent) -> void:
+	if not is_ai_battle_mode:
+		return
+	
+	# 调试快捷键
+	if event.is_action_pressed("ui_accept") and Input.is_action_pressed("ui_cancel"):
+		# Ctrl+Enter: 切换AI调试可视化
+		if ai_debug_visualizer:
+			ai_debug_visualizer.toggle_debug_visualization()
+	
+	if event.is_action_pressed("ui_right") and Input.is_action_pressed("ui_cancel"):
+		# Ctrl+Right: 强制AI立即决策
+		if ai_player:
+			ai_player.force_decision()
+
+## 清理AI系统
+func _cleanup_ai_system() -> void:
+	# 停止AI移动计时器
+	var ai_move_timer = find_child("AIMoveTimer")
+	if ai_move_timer:
+		ai_move_timer.queue_free()
+	
+	if ai_player:
+		ai_player.stop_ai()
+		ai_player.queue_free()
+		ai_player = null
+	
+	if ai_snake:
+		ai_snake.queue_free()
+		ai_snake = null
+	
+	if ai_debug_visualizer:
+		ai_debug_visualizer.queue_free()
+		ai_debug_visualizer = null
+	
+	print("AI system cleaned up")
+
+## 重新初始化AI系统
+func _reinitialize_ai_system() -> void:
+	print("Reinitializing AI system...")
+	
+	# 清理旧的AI系统
+	_cleanup_ai_system()
+	
+	# 重新创建AI系统
+	_create_ai_system()
+	
+	print("AI system reinitialized")
+
+## 场景退出时清理
+func _exit_tree() -> void:
+	_cleanup_ai_system()

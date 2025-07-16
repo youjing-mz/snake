@@ -29,6 +29,9 @@ var pulse_tween: Tween
 var spawn_tween: Tween
 
 func _ready() -> void:
+	# 设置节点组
+	add_to_group("food")
+	
 	# 创建视觉节点
 	_create_visual_node()
 	

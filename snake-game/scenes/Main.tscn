@@ -48,7 +48,11 @@ layout_mode = 2
 
 [node name="StartButton" type="Button" parent="CanvasLayer/MenuContainer/MainMenuUI"]
 layout_mode = 2
-text = "开始游戏"
+text = "单人游戏"
+
+[node name="AIBattleButton" type="Button" parent="CanvasLayer/MenuContainer/MainMenuUI"]
+layout_mode = 2
+text = "AI对战"
 
 [node name="SettingsButton" type="Button" parent="CanvasLayer/MenuContainer/MainMenuUI"]
 layout_mode = 2
@@ -61,6 +65,78 @@ text = "最高分"
 [node name="QuitButton" type="Button" parent="CanvasLayer/MenuContainer/MainMenuUI"]
 layout_mode = 2
 text = "退出游戏"
+
+[node name="AIModeMenuUI" type="VBoxContainer" parent="CanvasLayer/MenuContainer"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -180.0
+offset_right = 200.0
+offset_bottom = 180.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="AIModeTitle" type="Label" parent="CanvasLayer/MenuContainer/AIModeMenuUI"]
+layout_mode = 2
+text = "AI对战模式"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="CanvasLayer/MenuContainer/AIModeMenuUI"]
+layout_mode = 2
+
+[node name="DifficultyContainer" type="VBoxContainer" parent="CanvasLayer/MenuContainer/AIModeMenuUI"]
+layout_mode = 2
+
+[node name="DifficultyLabel" type="Label" parent="CanvasLayer/MenuContainer/AIModeMenuUI/DifficultyContainer"]
+layout_mode = 2
+text = "选择AI难度："
+horizontal_alignment = 1
+
+[node name="EasyButton" type="Button" parent="CanvasLayer/MenuContainer/AIModeMenuUI/DifficultyContainer"]
+layout_mode = 2
+text = "简单 - 反应慢，容易出错"
+
+[node name="NormalButton" type="Button" parent="CanvasLayer/MenuContainer/AIModeMenuUI/DifficultyContainer"]
+layout_mode = 2
+text = "普通 - 平衡的挑战"
+
+[node name="HardButton" type="Button" parent="CanvasLayer/MenuContainer/AIModeMenuUI/DifficultyContainer"]
+layout_mode = 2
+text = "困难 - 聪明且快速"
+
+[node name="ExpertButton" type="Button" parent="CanvasLayer/MenuContainer/AIModeMenuUI/DifficultyContainer"]
+layout_mode = 2
+text = "专家 - 几乎完美"
+
+[node name="HSeparator2" type="HSeparator" parent="CanvasLayer/MenuContainer/AIModeMenuUI"]
+layout_mode = 2
+
+[node name="DebugContainer" type="HBoxContainer" parent="CanvasLayer/MenuContainer/AIModeMenuUI"]
+layout_mode = 2
+
+[node name="DebugLabel" type="Label" parent="CanvasLayer/MenuContainer/AIModeMenuUI/DebugContainer"]
+layout_mode = 2
+text = "调试模式:"
+
+[node name="DebugCheckBox" type="CheckBox" parent="CanvasLayer/MenuContainer/AIModeMenuUI/DebugContainer"]
+layout_mode = 2
+text = "显示AI思考过程"
+
+[node name="HSeparator3" type="HSeparator" parent="CanvasLayer/MenuContainer/AIModeMenuUI"]
+layout_mode = 2
+
+[node name="ButtonContainer" type="HBoxContainer" parent="CanvasLayer/MenuContainer/AIModeMenuUI"]
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="CanvasLayer/MenuContainer/AIModeMenuUI/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "返回"
 
 [node name="SettingsMenuUI" type="VBoxContainer" parent="CanvasLayer/MenuContainer"]
 visible = false

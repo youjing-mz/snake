@@ -26,6 +26,9 @@ var move_interval: float = 0.2
 var segment_nodes: Array[Node2D] = []
 var head_node: Node2D
 
+# 蛇的颜色（可配置）
+var snake_color: Color = GameColors.SNAKE_BODY_COLOR
+
 # 初始位置和长度
 const INITIAL_LENGTH: int = 3
 const INITIAL_POSITION: Vector2 = Vector2(10, 15)
@@ -52,6 +55,25 @@ func _initialize_snake() -> void:
 	next_direction = Vector2.RIGHT
 	is_growing = false
 	is_alive = true
+
+## 初始化蛇身（公开接口，支持自定义位置和方向）
+func initialize_snake(start_pos: Vector2, start_direction: Vector2) -> void:
+	body.clear()
+	
+	# 根据方向创建初始蛇身
+	for i in range(INITIAL_LENGTH):
+		body.append(start_pos - start_direction * i)
+	
+	# 设置方向
+	direction = start_direction
+	next_direction = start_direction
+	is_growing = false
+	is_alive = true
+	
+	# 重新创建视觉节点
+	_create_visual_nodes()
+	
+	print("Snake initialized at ", start_pos, " facing ", start_direction)
 
 ## 创建视觉节点
 func _create_visual_nodes() -> void:
@@ -85,7 +107,7 @@ func _create_segment_node(is_head: bool = false) -> Node2D:
 			Vector2(-size * 0.2, size * 0.4)
 		])
 		head_shape.polygon = points
-		head_shape.color = GameColors.SNAKE_HEAD_COLOR
+		head_shape.color = snake_color
 		segment.add_child(head_shape)
 		
 		# 添加眼睛
@@ -96,7 +118,8 @@ func _create_segment_node(is_head: bool = false) -> Node2D:
 		var size = GameSizes.SNAKE_SEGMENT_SIZE
 		body_shape.size = Vector2(size * 0.9, size * 0.9)
 		body_shape.position = Vector2(-size * 0.45, -size * 0.45)
-		body_shape.color = GameColors.SNAKE_BODY_COLOR
+		# 使用蛇的颜色，但稍微暗一点以区分头部
+		body_shape.color = snake_color.darkened(0.2)
 		segment.add_child(body_shape)
 	
 	return segment

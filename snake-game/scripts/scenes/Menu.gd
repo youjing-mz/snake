@@ -9,6 +9,7 @@ extends Node2D
 # UI引用
 @onready var main_menu: Control
 @onready var settings_menu: Control
+@onready var ai_mode_menu: Control
 
 # 管理器引用
 var scene_manager: SceneManager
@@ -17,10 +18,15 @@ var save_manager: SaveManager
 # 菜单状态
 enum MenuState {
 	MAIN,
-	SETTINGS
+	SETTINGS,
+	AI_MODE
 }
 
 var current_state: MenuState = MenuState.MAIN
+
+# AI模式配置
+var selected_ai_difficulty: int = 1  # 0=Easy, 1=Normal, 2=Hard, 3=Expert
+var ai_debug_enabled: bool = false
 var is_initialized: bool = false
 
 # 背景装饰
@@ -218,12 +224,15 @@ func _create_menu_ui() -> void:
 		print("Warning: MainMenuUI not found in scene")
 	if not settings_menu:
 		print("Warning: SettingsMenuUI not found in scene")
+	if not ai_mode_menu:
+		print("Warning: AIModeMenuUI not found in scene")
 
 ## 查找现有的UI节点
 func _find_existing_ui_nodes() -> void:
 	# 查找场景中已存在的UI节点
 	main_menu = find_child("MainMenuUI") as Control
 	settings_menu = find_child("SettingsMenuUI") as Control
+	ai_mode_menu = find_child("AIModeMenuUI") as Control
 	
 	if main_menu:
 		main_menu.z_index = 1
@@ -247,6 +256,9 @@ func _connect_signals() -> void:
 	
 	# 连接设置菜单按钮信号
 	_connect_settings_menu_signals()
+	
+	# 连接AI模式菜单信号
+	_connect_ai_mode_menu_signals()
 
 ## 连接主菜单信号
 func _connect_main_menu_signals() -> void:
@@ -255,12 +267,15 @@ func _connect_main_menu_signals() -> void:
 	
 	# 查找主菜单中的按钮
 	var start_button = main_menu.find_child("StartButton") as Button
+	var ai_battle_button = main_menu.find_child("AIBattleButton") as Button
 	var settings_button = main_menu.find_child("SettingsButton") as Button
 	var quit_button = main_menu.find_child("QuitButton") as Button
 	
 	# 连接按钮信号
 	if start_button:
 		start_button.pressed.connect(_on_start_game)
+	if ai_battle_button:
+		ai_battle_button.pressed.connect(_on_ai_battle_requested)
 	if settings_button:
 		settings_button.pressed.connect(_on_settings_requested)
 	if quit_button:
@@ -282,6 +297,37 @@ func _connect_settings_menu_signals() -> void:
 	if settings_menu.has_signal("back_to_menu_requested"):
 		settings_menu.back_to_menu_requested.connect(_on_back_to_main)
 
+## 连接AI模式菜单信号
+func _connect_ai_mode_menu_signals() -> void:
+	if not ai_mode_menu:
+		return
+	
+	# 查找AI模式菜单中的按钮
+	var easy_button = ai_mode_menu.find_child("EasyButton") as Button
+	var normal_button = ai_mode_menu.find_child("NormalButton") as Button
+	var hard_button = ai_mode_menu.find_child("HardButton") as Button
+	var expert_button = ai_mode_menu.find_child("ExpertButton") as Button
+	var debug_checkbox = ai_mode_menu.find_child("DebugCheckBox") as CheckBox
+	var back_button = ai_mode_menu.find_child("BackButton") as Button
+	
+	# 连接难度选择按钮
+	if easy_button:
+		easy_button.pressed.connect(_on_ai_difficulty_selected.bind(0))
+	if normal_button:
+		normal_button.pressed.connect(_on_ai_difficulty_selected.bind(1))
+	if hard_button:
+		hard_button.pressed.connect(_on_ai_difficulty_selected.bind(2))
+	if expert_button:
+		expert_button.pressed.connect(_on_ai_difficulty_selected.bind(3))
+	
+	# 连接调试模式选择
+	if debug_checkbox:
+		debug_checkbox.toggled.connect(_on_ai_debug_toggled)
+	
+	# 连接返回按钮
+	if back_button:
+		back_button.pressed.connect(_on_ai_mode_back_pressed)
+
 ## 设置菜单状态
 func _set_menu_state(new_state: MenuState) -> void:
 	current_state = new_state
@@ -291,6 +337,8 @@ func _set_menu_state(new_state: MenuState) -> void:
 			_show_main_menu()
 		MenuState.SETTINGS:
 			_show_settings_menu()
+		MenuState.AI_MODE:
+			_show_ai_mode_menu()
 
 ## 显示主菜单
 func _show_main_menu() -> void:
@@ -300,6 +348,8 @@ func _show_main_menu() -> void:
 	
 	if settings_menu:
 		_animate_menu_transition(settings_menu, false)
+	if ai_mode_menu:
+		_animate_menu_transition(ai_mode_menu, false)
 
 ## 显示设置菜单
 func _show_settings_menu() -> void:
@@ -309,6 +359,22 @@ func _show_settings_menu() -> void:
 	
 	if main_menu:
 		_animate_menu_transition(main_menu, false)
+	if ai_mode_menu:
+		_animate_menu_transition(ai_mode_menu, false)
+
+## 显示AI模式菜单
+func _show_ai_mode_menu() -> void:
+	if ai_mode_menu:
+		ai_mode_menu.visible = true
+		_animate_menu_transition(ai_mode_menu, true)
+		
+		# 更新UI状态
+		_update_ai_mode_ui()
+	
+	if main_menu:
+		_animate_menu_transition(main_menu, false)
+	if settings_menu:
+		_animate_menu_transition(settings_menu, false)
 
 ## 菜单过渡动画
 func _animate_menu_transition(menu: Control, show: bool) -> void:
@@ -345,9 +411,14 @@ func _on_back_to_main() -> void:
 
 ## 开始游戏信号处理
 func _on_start_game() -> void:
-	print("Starting game")
+	print("Starting single player game")
 	if scene_manager:
 		scene_manager.change_scene(SceneManager.SceneType.GAME)
+
+## AI对战请求处理
+func _on_ai_battle_requested() -> void:
+	print("AI battle mode requested")
+	_set_menu_state(MenuState.AI_MODE)
 
 ## 退出游戏信号处理
 func _on_quit_game() -> void:
@@ -365,6 +436,8 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("cancel"):
 		match current_state:
 			MenuState.SETTINGS:
+				_set_menu_state(MenuState.MAIN)
+			MenuState.AI_MODE:
 				_set_menu_state(MenuState.MAIN)
 			MenuState.MAIN:
 				# 可以添加退出游戏确认
@@ -539,3 +612,53 @@ func get_background_grid() -> Grid:
 
 func get_demo_snake() -> Snake:
 	return demo_snake
+
+## AI难度选择处理
+func _on_ai_difficulty_selected(difficulty: int) -> void:
+	selected_ai_difficulty = difficulty
+	var difficulty_names = ["简单", "普通", "困难", "专家"]
+	print("AI difficulty selected: ", difficulty_names[difficulty])
+	
+	# 启动AI对战游戏
+	_start_ai_battle_game()
+
+## AI调试模式切换处理
+func _on_ai_debug_toggled(enabled: bool) -> void:
+	ai_debug_enabled = enabled
+	print("AI debug mode: ", "enabled" if enabled else "disabled")
+
+## AI模式返回按钮处理
+func _on_ai_mode_back_pressed() -> void:
+	print("Returning to main menu from AI mode")
+	_set_menu_state(MenuState.MAIN)
+
+## 更新AI模式UI状态
+func _update_ai_mode_ui() -> void:
+	if not ai_mode_menu:
+		return
+	
+	# 更新调试复选框状态
+	var debug_checkbox = ai_mode_menu.find_child("DebugCheckBox") as CheckBox
+	if debug_checkbox:
+		debug_checkbox.button_pressed = ai_debug_enabled
+
+## 启动AI对战游戏
+func _start_ai_battle_game() -> void:
+	print("Starting AI battle game with difficulty: ", selected_ai_difficulty)
+	
+	# 保存AI配置到SaveManager
+	if save_manager:
+		save_manager.set_setting("ai_difficulty", selected_ai_difficulty)
+		save_manager.set_setting("ai_debug_enabled", ai_debug_enabled)
+		save_manager.set_setting("game_mode", "ai_battle")
+	
+	# 切换到游戏场景
+	if scene_manager:
+		scene_manager.change_scene(SceneManager.SceneType.GAME)
+
+## 获取AI配置
+func get_ai_config() -> Dictionary:
+	return {
+		"difficulty": selected_ai_difficulty,
+		"debug_enabled": ai_debug_enabled
+	}

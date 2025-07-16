@@ -6,7 +6,7 @@
 extends Node
 
 # 场景切换信号
-signal scene_changed(scene_name: String)
+signal scene_changed(scene_type: SceneType)
 
 # 场景类型枚举
 enum SceneType { MENU, GAME, SETTINGS, GAME_OVER }
@@ -67,7 +67,7 @@ func _perform_scene_change(scene_path: String, scene_type: SceneType) -> void:
 	get_tree().current_scene = current_scene
 	
 	# 发送场景切换信号
-	scene_changed.emit(get_scene_name(scene_type))
+	scene_changed.emit(scene_type)
 
 ## 获取当前场景
 func get_current_scene() -> Node:

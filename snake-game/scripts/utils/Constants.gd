@@ -63,3 +63,8 @@ static func get_grid_width() -> int:
 ## 兼容性函数：获取网格高度  
 static func get_grid_height() -> int:
 	return get_current_grid_size().y
+
+## 获取网格尺寸（返回Vector2格式，用于AI系统兼容性）
+static func get_grid_size() -> Vector2:
+	var size = get_current_grid_size()
+	return Vector2(size.x, size.y)
