@@ -1,0 +1,145 @@
+[gd_scene load_steps=5 format=3 uid="uid://c8y4n6x2m9qwe"]
+
+[ext_resource type="Script" path="res://scripts/scenes/Game.gd" id="1_a7b8c"]
+[ext_resource type="Script" path="res://scripts/managers/GameManager.gd" id="2_d9e0f"]
+[ext_resource type="Script" path="res://scripts/managers/SceneManager.gd" id="3_g1h2i"]
+[ext_resource type="Script" path="res://scripts/managers/SaveManager.gd" id="4_j3k4l"]
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_a7b8c")
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("2_d9e0f")
+
+[node name="SceneManager" type="Node" parent="."]
+script = ExtResource("3_g1h2i")
+
+[node name="SaveManager" type="Node" parent="."]
+script = ExtResource("4_j3k4l")
+
+[node name="GameArea" type="Node2D" parent="."]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="GameUI" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopBar" type="HBoxContainer" parent="CanvasLayer/GameUI"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 50.0
+grow_horizontal = 2
+
+[node name="ScoreLabel" type="Label" parent="CanvasLayer/GameUI/TopBar"]
+layout_mode = 2
+text = "分数: 0"
+
+[node name="VSeparator" type="VSeparator" parent="CanvasLayer/GameUI/TopBar"]
+layout_mode = 2
+
+[node name="LevelLabel" type="Label" parent="CanvasLayer/GameUI/TopBar"]
+layout_mode = 2
+text = "等级: 1"
+
+[node name="VSeparator2" type="VSeparator" parent="CanvasLayer/GameUI/TopBar"]
+layout_mode = 2
+
+[node name="SpeedLabel" type="Label" parent="CanvasLayer/GameUI/TopBar"]
+layout_mode = 2
+text = "速度: 5.0"
+
+[node name="Spacer" type="Control" parent="CanvasLayer/GameUI/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PauseButton" type="Button" parent="CanvasLayer/GameUI/TopBar"]
+layout_mode = 2
+text = "暂停"
+
+[node name="PausePanel" type="Panel" parent="CanvasLayer/GameUI"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PauseContainer" type="VBoxContainer" parent="CanvasLayer/GameUI/PausePanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -50.0
+offset_right = 100.0
+offset_bottom = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PauseTitle" type="Label" parent="CanvasLayer/GameUI/PausePanel/PauseContainer"]
+layout_mode = 2
+text = "游戏暂停"
+horizontal_alignment = 1
+
+[node name="PauseHint" type="Label" parent="CanvasLayer/GameUI/PausePanel/PauseContainer"]
+layout_mode = 2
+text = "按空格键继续游戏"
+horizontal_alignment = 1
+
+[node name="GameOverPanel" type="Panel" parent="CanvasLayer/GameUI"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GameOverContainer" type="VBoxContainer" parent="CanvasLayer/GameUI/GameOverPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -100.0
+offset_right = 150.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GameOverTitle" type="Label" parent="CanvasLayer/GameUI/GameOverPanel/GameOverContainer"]
+layout_mode = 2
+text = "游戏结束"
+horizontal_alignment = 1
+
+[node name="FinalScoreLabel" type="Label" parent="CanvasLayer/GameUI/GameOverPanel/GameOverContainer"]
+layout_mode = 2
+text = "最终分数: 0"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="CanvasLayer/GameUI/GameOverPanel/GameOverContainer"]
+layout_mode = 2
+
+[node name="ButtonContainer" type="HBoxContainer" parent="CanvasLayer/GameUI/GameOverPanel/GameOverContainer"]
+layout_mode = 2
+
+[node name="RestartButton" type="Button" parent="CanvasLayer/GameUI/GameOverPanel/GameOverContainer/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "重新开始"
+
+[node name="MenuButton" type="Button" parent="CanvasLayer/GameUI/GameOverPanel/GameOverContainer/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "返回菜单"

@@ -1,0 +1,148 @@
+[gd_scene load_steps=4 format=3 uid="uid://bxqvn8y7qkqxe"]
+
+[ext_resource type="Script" uid="uid://ctxu41ivom7kv" path="res://scripts/scenes/Menu.gd" id="1_0k8vx"]
+[ext_resource type="Script" uid="uid://dj6g0cvp0insu" path="res://scripts/managers/SceneManager.gd" id="2_h5m3p"]
+[ext_resource type="Script" uid="uid://bqg0uk5p5r8ga" path="res://scripts/managers/SaveManager.gd" id="3_j2k9l"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_0k8vx")
+
+[node name="SceneManager" type="Node" parent="."]
+script = ExtResource("2_h5m3p")
+
+[node name="SaveManager" type="Node" parent="."]
+script = ExtResource("3_j2k9l")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="MenuContainer" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainMenuUI" type="VBoxContainer" parent="CanvasLayer/MenuContainer"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -100.0
+offset_right = 150.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="CanvasLayer/MenuContainer/MainMenuUI"]
+layout_mode = 2
+text = "贪吃蛇游戏"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="CanvasLayer/MenuContainer/MainMenuUI"]
+layout_mode = 2
+
+[node name="StartButton" type="Button" parent="CanvasLayer/MenuContainer/MainMenuUI"]
+layout_mode = 2
+text = "开始游戏"
+
+[node name="SettingsButton" type="Button" parent="CanvasLayer/MenuContainer/MainMenuUI"]
+layout_mode = 2
+text = "游戏设置"
+
+[node name="HighScoreButton" type="Button" parent="CanvasLayer/MenuContainer/MainMenuUI"]
+layout_mode = 2
+text = "最高分"
+
+[node name="QuitButton" type="Button" parent="CanvasLayer/MenuContainer/MainMenuUI"]
+layout_mode = 2
+text = "退出游戏"
+
+[node name="SettingsMenuUI" type="VBoxContainer" parent="CanvasLayer/MenuContainer"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -150.0
+offset_right = 200.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SettingsTitleLabel" type="Label" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
+layout_mode = 2
+text = "游戏设置"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
+layout_mode = 2
+
+[node name="VolumeContainer" type="HBoxContainer" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
+layout_mode = 2
+
+[node name="VolumeLabel" type="Label" parent="CanvasLayer/MenuContainer/SettingsMenuUI/VolumeContainer"]
+layout_mode = 2
+text = "音量: 100%"
+
+[node name="VolumeSlider" type="HSlider" parent="CanvasLayer/MenuContainer/SettingsMenuUI/VolumeContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="FullscreenCheckBox" type="CheckBox" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
+layout_mode = 2
+text = "全屏模式"
+
+[node name="GridVisibleCheckBox" type="CheckBox" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
+layout_mode = 2
+button_pressed = true
+text = "显示网格"
+
+[node name="DifficultyContainer" type="HBoxContainer" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
+layout_mode = 2
+
+[node name="DifficultyLabel" type="Label" parent="CanvasLayer/MenuContainer/SettingsMenuUI/DifficultyContainer"]
+layout_mode = 2
+text = "难度:"
+
+[node name="DifficultyOption" type="OptionButton" parent="CanvasLayer/MenuContainer/SettingsMenuUI/DifficultyContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 1
+item_count = 3
+popup/item_0/text = "简单"
+popup/item_0/id = 0
+popup/item_1/text = "普通"
+popup/item_1/id = 1
+popup/item_2/text = "困难"
+popup/item_2/id = 2
+
+[node name="HSeparator2" type="HSeparator" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
+layout_mode = 2
+
+[node name="ButtonContainer" type="HBoxContainer" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
+layout_mode = 2
+
+[node name="ResetButton" type="Button" parent="CanvasLayer/MenuContainer/SettingsMenuUI/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "重置默认"
+
+[node name="ApplyButton" type="Button" parent="CanvasLayer/MenuContainer/SettingsMenuUI/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "应用"
+
+[node name="BackButton" type="Button" parent="CanvasLayer/MenuContainer/SettingsMenuUI/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "返回"

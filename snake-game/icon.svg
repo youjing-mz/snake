@@ -1,0 +1,36 @@
+<svg height="128" width="128" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="124" height="124" fill="#363d52" stroke="#212532" stroke-width="4"/>
+  <g transform="scale(.101) translate(640 640)">
+    <!-- Snake body segments -->
+    <circle cx="-300" cy="-200" r="80" fill="#4CAF50"/>
+    <circle cx="-150" cy="-200" r="80" fill="#4CAF50"/>
+    <circle cx="0" cy="-200" r="80" fill="#4CAF50"/>
+    <circle cx="150" cy="-200" r="80" fill="#4CAF50"/>
+    
+    <!-- Snake head -->
+    <circle cx="300" cy="-200" r="80" fill="#66BB6A"/>
+    
+    <!-- Snake eyes -->
+    <circle cx="270" cy="-230" r="15" fill="#000"/>
+    <circle cx="270" cy="-170" r="15" fill="#000"/>
+    
+    <!-- Food/Apple -->
+    <circle cx="200" cy="100" r="60" fill="#F44336"/>
+    <rect x="190" y="40" width="20" height="40" fill="#4CAF50"/>
+    
+    <!-- Grid lines -->
+    <g stroke="#555" stroke-width="8" opacity="0.3">
+      <line x1="-400" y1="-400" x2="400" y2="-400"/>
+      <line x1="-400" y1="-200" x2="400" y2="-200"/>
+      <line x1="-400" y1="0" x2="400" y2="0"/>
+      <line x1="-400" y1="200" x2="400" y2="200"/>
+      <line x1="-400" y1="400" x2="400" y2="400"/>
+      
+      <line x1="-400" y1="-400" x2="-400" y2="400"/>
+      <line x1="-200" y1="-400" x2="-200" y2="400"/>
+      <line x1="0" y1="-400" x2="0" y2="400"/>
+      <line x1="200" y1="-400" x2="200" y2="400"/>
+      <line x1="400" y1="-400" x2="400" y2="400"/>
+    </g>
+  </g>
+</svg>
