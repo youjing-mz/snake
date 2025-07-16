@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://bxqvn8y7qkqxe"]
+[gd_scene load_steps=5 format=3 uid="uid://bxqvn8y7qkqxe"]
 
 [ext_resource type="Script" uid="uid://ctxu41ivom7kv" path="res://scripts/scenes/Menu.gd" id="1_0k8vx"]
 [ext_resource type="Script" uid="uid://dj6g0cvp0insu" path="res://scripts/managers/SceneManager.gd" id="2_h5m3p"]
 [ext_resource type="Script" uid="uid://bqg0uk5p5r8ga" path="res://scripts/managers/SaveManager.gd" id="3_j2k9l"]
+[ext_resource type="Script" uid="uid://dgin8dpyk3k4o" path="res://scripts/ui/SettingsMenu.gd" id="4_a5b2c"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_0k8vx")
@@ -75,6 +76,7 @@ offset_right = 200.0
 offset_bottom = 150.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("4_a5b2c")
 
 [node name="SettingsTitleLabel" type="Label" parent="CanvasLayer/MenuContainer/SettingsMenuUI"]
 layout_mode = 2

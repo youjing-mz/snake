@@ -43,7 +43,8 @@ class SaveData:
 			"music_enabled": true,
 			"difficulty": "normal"
 		})
-		achievements = data.get("achievements", [])
+		var temp_achievements = data.get("achievements", [])
+		achievements.assign(temp_achievements.filter(func(x): return x is String))
 		last_played = data.get("last_played", "")
 
 # 当前存档数据

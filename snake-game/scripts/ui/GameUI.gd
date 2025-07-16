@@ -16,6 +16,7 @@ extends Control
 @onready var final_score_label: Label
 @onready var restart_button: Button
 @onready var menu_button: Button
+@onready var continue_button: Button
 
 # 游戏管理器引用
 var game_manager: GameManager
@@ -42,12 +43,9 @@ func _ready() -> void:
 
 ## 获取管理器引用
 func _get_manager_references() -> void:
-	# 从父节点或场景树中查找管理器
-	game_manager = get_parent() as GameManager
-	if not game_manager:
-		game_manager = get_tree().get_first_node_in_group("game_manager")
-	
-	scene_manager = get_tree().get_first_node_in_group("scene_manager")
+	# 直接引用autoload单例
+	game_manager = GameManager
+	scene_manager = SceneManager
 	
 	if not game_manager:
 		print("Warning: GameManager not found")
@@ -59,18 +57,11 @@ func _setup_ui() -> void:
 	# 查找UI节点
 	_find_ui_nodes()
 	
-	# 如果找不到节点，创建基本UI
-	if not score_label:
-		_create_fallback_ui()
+
 	
-	# 设置UI样式
-	_setup_ui_styles()
-	
-	# 初始隐藏面板
-	if pause_panel:
-		pause_panel.visible = false
-	if game_over_panel:
-		game_over_panel.visible = false
+	# 验证必要的UI节点是否存在
+	if not score_label or not level_label or not speed_label or not pause_button:
+		print("Warning: Some UI nodes are missing in the scene file")
 
 ## 查找UI节点
 func _find_ui_nodes() -> void:
@@ -83,130 +74,13 @@ func _find_ui_nodes() -> void:
 	final_score_label = find_child("FinalScoreLabel") as Label
 	restart_button = find_child("RestartButton") as Button
 	menu_button = find_child("MenuButton") as Button
+	continue_button = find_child("ContinueButton") as Button
 
-## 创建备用UI
-func _create_fallback_ui() -> void:
-	print("Creating fallback GameUI structure")
-	
-	# 创建顶部信息栏
-	var top_bar = HBoxContainer.new()
-	top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	top_bar.add_theme_constant_override("separation", GameSizes.MARGIN_MEDIUM)
-	add_child(top_bar)
-	
-	# 分数标签
-	score_label = Label.new()
-	score_label.text = "分数: 0"
-	top_bar.add_child(score_label)
-	
-	# 等级标签
-	level_label = Label.new()
-	level_label.text = "等级: 1"
-	top_bar.add_child(level_label)
-	
-	# 速度标签
-	speed_label = Label.new()
-	speed_label.text = "速度: 5.0"
-	top_bar.add_child(speed_label)
-	
-	# 弹簧（推送暂停按钮到右侧）
-	var spacer = Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_bar.add_child(spacer)
-	
-	# 暂停按钮
-	pause_button = Button.new()
-	pause_button.text = "暂停"
-	pause_button.custom_minimum_size = Vector2(80, 30)
-	top_bar.add_child(pause_button)
-	
-	# 创建暂停面板
-	_create_pause_panel()
-	
-	# 创建游戏结束面板
-	_create_game_over_panel()
 
-## 创建暂停面板
-func _create_pause_panel() -> void:
-	pause_panel = Panel.new()
-	pause_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	pause_panel.color = Color(0, 0, 0, 0.7)  # 半透明黑色背景
-	add_child(pause_panel)
-	
-	# 暂停面板内容
-	var pause_container = VBoxContainer.new()
-	pause_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	pause_panel.add_child(pause_container)
-	
-	# 暂停标题
-	var pause_title = Label.new()
-	pause_title.text = "游戏暂停"
-	pause_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pause_container.add_child(pause_title)
-	
-	# 提示文本
-	var pause_hint = Label.new()
-	pause_hint.text = "按空格键继续游戏"
-	pause_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pause_container.add_child(pause_hint)
 
-## 创建游戏结束面板
-func _create_game_over_panel() -> void:
-	game_over_panel = Panel.new()
-	game_over_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	game_over_panel.color = Color(0, 0, 0, 0.8)  # 半透明黑色背景
-	add_child(game_over_panel)
-	
-	# 游戏结束面板内容
-	var game_over_container = VBoxContainer.new()
-	game_over_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	game_over_container.add_theme_constant_override("separation", GameSizes.MARGIN_MEDIUM)
-	game_over_panel.add_child(game_over_container)
-	
-	# 游戏结束标题
-	var game_over_title = Label.new()
-	game_over_title.text = "游戏结束"
-	game_over_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	game_over_container.add_child(game_over_title)
-	
-	# 最终分数
-	final_score_label = Label.new()
-	final_score_label.text = "最终分数: 0"
-	final_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	game_over_container.add_child(final_score_label)
-	
-	# 按钮容器
-	var button_container = HBoxContainer.new()
-	button_container.add_theme_constant_override("separation", GameSizes.MARGIN_MEDIUM)
-	game_over_container.add_child(button_container)
-	
-	# 重新开始按钮
-	restart_button = Button.new()
-	restart_button.text = "重新开始"
-	restart_button.custom_minimum_size = Vector2(100, 40)
-	button_container.add_child(restart_button)
-	
-	# 返回菜单按钮
-	menu_button = Button.new()
-	menu_button.text = "返回菜单"
-	menu_button.custom_minimum_size = Vector2(100, 40)
-	button_container.add_child(menu_button)
 
-## 设置UI样式
-func _setup_ui_styles() -> void:
-	# 设置标签样式
-	var labels = [score_label, level_label, speed_label, final_score_label]
-	for label in labels:
-		if label:
-			label.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_MEDIUM)
-			label.add_theme_color_override("font_color", GameColors.WHITE)
-	
-	# 设置按钮样式
-	var buttons = [pause_button, restart_button, menu_button]
-	for button in buttons:
-		if button:
-			button.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_MEDIUM)
-			button.add_theme_color_override("font_color", GameColors.WHITE)
+
+
 
 ## 连接信号
 func _connect_signals() -> void:
@@ -219,6 +93,9 @@ func _connect_signals() -> void:
 	
 	if menu_button:
 		menu_button.pressed.connect(_on_menu_button_pressed)
+	
+	if continue_button:
+		continue_button.pressed.connect(_on_continue_button_pressed)
 	
 	# 连接游戏管理器信号
 	if game_manager:
@@ -252,23 +129,23 @@ func _update_speed_display(speed: float) -> void:
 
 ## 显示暂停面板
 func _show_pause_panel() -> void:
+	print("Showing pause panel")
 	if pause_panel:
 		pause_panel.visible = true
 		is_paused = true
-	
-	# 更新暂停按钮文本
-	if pause_button:
-		pause_button.text = "继续"
+		print("Pause panel is now visible")
+	else:
+		print("Warning: pause_panel not found")
 
 ## 隐藏暂停面板
 func _hide_pause_panel() -> void:
+	print("Hiding pause panel")
 	if pause_panel:
 		pause_panel.visible = false
 		is_paused = false
-	
-	# 更新暂停按钮文本
-	if pause_button:
-		pause_button.text = "暂停"
+		print("Pause panel is now hidden")
+	else:
+		print("Warning: pause_panel not found")
 
 ## 显示游戏结束面板
 func _show_game_over_panel(final_score: int) -> void:
@@ -324,6 +201,13 @@ func _on_menu_button_pressed() -> void:
 	if scene_manager:
 		scene_manager.change_scene(SceneManager.SceneType.MENU)
 
+## 继续按钮点击
+func _on_continue_button_pressed() -> void:
+	print("Continue button pressed")
+	
+	if game_manager:
+		game_manager.resume_game()
+
 ## 分数变化信号处理
 func _on_score_changed(new_score: int) -> void:
 	_update_score_display(new_score)
@@ -340,10 +224,12 @@ func _on_level_changed(new_level: int) -> void:
 
 ## 游戏暂停信号处理
 func _on_game_paused() -> void:
+	print("GameUI received game_paused signal")
 	_show_pause_panel()
 
 ## 游戏恢复信号处理
 func _on_game_resumed() -> void:
+	print("GameUI received game_resumed signal")
 	_hide_pause_panel()
 
 ## 游戏结束信号处理
@@ -379,6 +265,14 @@ func _input(event: InputEvent) -> void:
 			_on_restart_button_pressed()
 		elif event.is_action_pressed("cancel"):
 			_on_menu_button_pressed()
+
+## 更新分数（外部调用）
+func update_score(score: int) -> void:
+	_update_score_display(score)
+
+## 更新等级（外部调用）
+func update_level(level: int) -> void:
+	_update_level_display(level)
 
 ## 更新速度显示（游戏管理器调用）
 func update_speed_display() -> void:

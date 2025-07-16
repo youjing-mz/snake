@@ -51,14 +51,11 @@ func _setup_ui() -> void:
 	# 查找UI节点
 	_find_ui_nodes()
 	
-	# 设置按钮样式
-	_setup_button_styles()
+
 	
 	# 设置标题
 	if title_label:
 		title_label.text = "贪吃蛇游戏"
-		title_label.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_TITLE)
-		title_label.add_theme_color_override("font_color", GameColors.WHITE)
 
 ## 查找UI节点
 func _find_ui_nodes() -> void:
@@ -69,78 +66,21 @@ func _find_ui_nodes() -> void:
 	high_score_label = find_child("HighScoreLabel") as Label
 	title_label = find_child("Title") as Label
 	
-	# 如果找不到节点，创建基本的UI结构
+	# 验证必要的UI节点是否存在
 	if not start_button:
-		_create_fallback_ui()
+		print("Warning: StartButton not found in scene")
+	if not settings_button:
+		print("Warning: SettingsButton not found in scene")
+	if not quit_button:
+		print("Warning: QuitButton not found in scene")
+	if not high_score_label:
+		print("Warning: HighScoreLabel not found in scene")
+	if not title_label:
+		print("Warning: Title not found in scene")
 
-## 创建备用UI结构
-func _create_fallback_ui() -> void:
-	print("Creating fallback UI structure")
-	
-	# 创建主容器
-	var main_container = VBoxContainer.new()
-	main_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	add_child(main_container)
-	
-	# 创建标题
-	title_label = Label.new()
-	title_label.text = "贪吃蛇游戏"
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	main_container.add_child(title_label)
-	
-	# 添加间距
-	var spacer1 = Control.new()
-	spacer1.custom_minimum_size = Vector2(0, GameSizes.MARGIN_LARGE)
-	main_container.add_child(spacer1)
-	
-	# 创建按钮容器
-	var button_container = VBoxContainer.new()
-	button_container.add_theme_constant_override("separation", GameSizes.MARGIN_MEDIUM)
-	main_container.add_child(button_container)
-	
-	# 创建开始按钮
-	start_button = Button.new()
-	start_button.text = "开始游戏"
-	start_button.custom_minimum_size = Vector2(GameSizes.BUTTON_WIDTH, GameSizes.BUTTON_HEIGHT)
-	button_container.add_child(start_button)
-	
-	# 创建设置按钮
-	settings_button = Button.new()
-	settings_button.text = "设置"
-	settings_button.custom_minimum_size = Vector2(GameSizes.BUTTON_WIDTH, GameSizes.BUTTON_HEIGHT)
-	button_container.add_child(settings_button)
-	
-	# 创建退出按钮
-	quit_button = Button.new()
-	quit_button.text = "退出游戏"
-	quit_button.custom_minimum_size = Vector2(GameSizes.BUTTON_WIDTH, GameSizes.BUTTON_HEIGHT)
-	button_container.add_child(quit_button)
-	
-	# 添加间距
-	var spacer2 = Control.new()
-	spacer2.custom_minimum_size = Vector2(0, GameSizes.MARGIN_LARGE)
-	main_container.add_child(spacer2)
-	
-	# 创建最高分显示
-	high_score_label = Label.new()
-	high_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	main_container.add_child(high_score_label)
 
-## 设置按钮样式
-func _setup_button_styles() -> void:
-	var buttons = [start_button, settings_button, quit_button]
-	
-	for button in buttons:
-		if button:
-			# 设置字体大小
-			button.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_MEDIUM)
-			
-			# 设置颜色
-			button.add_theme_color_override("font_color", GameColors.WHITE)
-			button.add_theme_color_override("font_hover_color", GameColors.BUTTON_HOVER_COLOR)
-			
-			# 设置焦点模式
-			button.focus_mode = Control.FOCUS_ALL
+
+
 
 ## 连接信号
 func _connect_signals() -> void:
@@ -162,8 +102,6 @@ func _update_display() -> void:
 	if high_score_label and save_manager:
 		var save_data = save_manager.get_save_data()
 		high_score_label.text = "最高分: " + str(save_data.high_score)
-		high_score_label.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_MEDIUM)
-		high_score_label.add_theme_color_override("font_color", GameColors.LIGHT_GRAY)
 
 ## 处理输入
 func _input(event: InputEvent) -> void:

@@ -32,7 +32,7 @@ func _ready() -> void:
 	_initialize_game_scene()
 	
 	# 设置游戏区域
-	_setup_game_area()
+	_calculate_game_area()
 	
 	# 创建游戏对象
 	_create_game_objects()
@@ -44,27 +44,25 @@ func _ready() -> void:
 	is_initialized = true
 	
 	print("Game scene initialized")
+	
+	# 应用保存的设置
+	_apply_saved_settings()
+	
+	# 设置游戏管理器的对象引用
+	if game_manager:
+		game_manager.snake = snake
+		game_manager.food = food
+		game_manager.grid = grid
+		
+		# 自动启动游戏
+		game_manager.start_game()
 
 ## 获取管理器引用
 func _get_manager_references() -> void:
-	# 查找或创建管理器
-	game_manager = get_tree().get_first_node_in_group("game_manager")
-	if not game_manager:
-		game_manager = GameManager.new()
-		game_manager.add_to_group("game_manager")
-		add_child(game_manager)
-	
-	scene_manager = get_tree().get_first_node_in_group("scene_manager")
-	if not scene_manager:
-		scene_manager = SceneManager.new()
-		scene_manager.add_to_group("scene_manager")
-		add_child(scene_manager)
-	
-	save_manager = get_tree().get_first_node_in_group("save_manager")
-	if not save_manager:
-		save_manager = SaveManager.new()
-		save_manager.add_to_group("save_manager")
-		add_child(save_manager)
+	# 直接引用autoload单例
+	game_manager = GameManager
+	scene_manager = SceneManager
+	save_manager = SaveManager
 
 ## 初始化游戏场景
 func _initialize_game_scene() -> void:
@@ -74,20 +72,23 @@ func _initialize_game_scene() -> void:
 	# 设置背景颜色
 	RenderingServer.set_default_clear_color(GameColors.BACKGROUND_DARK)
 
-## 设置游戏区域
-func _setup_game_area() -> void:
+## 计算游戏区域
+func _calculate_game_area() -> void:
 	# 计算游戏区域
 	var viewport_size = get_viewport().get_visible_rect().size
-	var game_width = Constants.GRID_WIDTH * GameSizes.CELL_SIZE
-	var game_height = Constants.GRID_HEIGHT * GameSizes.CELL_SIZE
+	var grid_size = Constants.get_current_grid_size()
+	var game_width = grid_size.x * GameSizes.GRID_SIZE
+	var game_height = grid_size.y * GameSizes.GRID_SIZE
 	
 	# 居中游戏区域
 	var offset_x = (viewport_size.x - game_width) / 2
-	var offset_y = (viewport_size.y - game_height) / 2 + GameSizes.UI_OFFSET_TOP
-	
+	var offset_y = (viewport_size.y - game_height) / 2
+
 	game_area_rect = Rect2(offset_x, offset_y, game_width, game_height)
 	
 	print("Game area: ", game_area_rect)
+	print("Viewport size: ", viewport_size)
+	print("Dynamic grid size: ", grid_size.x, "x", grid_size.y)
 
 ## 创建游戏对象
 func _create_game_objects() -> void:
@@ -133,20 +134,19 @@ func _create_food() -> void:
 	add_child(food)
 	
 	# Food会在_ready中自动初始化
-	
-	# 生成第一个食物
-	food.spawn_food(snake.get_body_positions())
+	# 不在这里生成食物，等到游戏开始时再生成
 	
 	print("Food created")
 
-## 创建UI
+## 获取UI引用
 func _create_ui() -> void:
-	game_ui = GameUI.new()
-	game_ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	game_ui.add_to_group("game_ui")
-	add_child(game_ui)
+	# 查找场景中已有的GameUI节点
+	game_ui = find_child("GameUI") as GameUI
+	if not game_ui:
+		print("Warning: GameUI node not found in scene")
+		return
 	
-	print("GameUI created")
+	print("GameUI reference obtained")
 
 ## 连接信号
 func _connect_signals() -> void:
@@ -156,16 +156,12 @@ func _connect_signals() -> void:
 		game_manager.game_paused.connect(_on_game_paused)
 		game_manager.game_resumed.connect(_on_game_resumed)
 		game_manager.game_over.connect(_on_game_over)
-		game_manager.food_eaten.connect(_on_food_eaten)
-	
-	# 连接蛇的信号
-	if snake:
-		snake.snake_moved.connect(_on_snake_moved)
-		snake.snake_died.connect(_on_snake_died)
+		game_manager.score_changed.connect(_on_score_changed)
+		game_manager.level_changed.connect(_on_level_changed)
 	
 	# 连接食物信号
 	if food:
-		food.food_eaten.connect(_on_food_eaten_animation)
+		food.food_consumed.connect(_on_food_consumed)
 
 ## 游戏开始信号处理
 func _on_game_started() -> void:
@@ -173,10 +169,16 @@ func _on_game_started() -> void:
 	
 	# 重置游戏对象
 	_reset_game_objects()
-	
-	# 设置游戏管理器的对象引用
-	if game_manager:
-		game_manager.set_game_objects(snake, food, grid)
+
+## 分数变化信号处理
+func _on_score_changed(new_score: int) -> void:
+	if game_ui:
+		game_ui.update_score(new_score)
+
+## 等级变化信号处理
+func _on_level_changed(new_level: int) -> void:
+	if game_ui:
+		game_ui.update_level(new_level)
 
 ## 游戏暂停信号处理
 func _on_game_paused() -> void:
@@ -208,34 +210,12 @@ func _on_game_over(final_score: int) -> void:
 	# 保存游戏数据
 	if save_manager:
 		save_manager.update_high_score(final_score)
-		save_manager.record_game_completion(final_score)
+		var current_level = game_manager.get_level() if game_manager else 1
+		save_manager.record_game_completion(final_score, current_level)
 
-## 食物被吃信号处理
-func _on_food_eaten(food_position: Vector2i, food_value: int) -> void:
-	print("Food eaten at: ", food_position, " value: ", food_value)
-	
-	# 生成新食物
-	if food and snake:
-		food.spawn_food(snake.get_body_positions())
-
-## 蛇移动信号处理
-func _on_snake_moved(new_head_position: Vector2i) -> void:
-	# 检查食物碰撞
-	if food and food.get_grid_position() == new_head_position:
-		# 通知游戏管理器食物被吃
-		if game_manager:
-			game_manager.handle_food_eaten(food.get_grid_position(), food.get_food_value())
-
-## 蛇死亡信号处理
-func _on_snake_died() -> void:
-	print("Snake died")
-	
-	# 通知游戏管理器游戏结束
-	if game_manager:
-		game_manager.end_game()
-
-## 食物被吃动画信号处理
-func _on_food_eaten_animation() -> void:
+## 食物被消费信号处理
+func _on_food_consumed(position: Vector2i, value: int) -> void:
+	print("Food consumed at: ", position, " value: ", value)
 	# 播放食物被吃的视觉效果
 	_play_food_eaten_effects()
 
@@ -247,7 +227,7 @@ func _reset_game_objects() -> void:
 	
 	# 重置食物
 	if food:
-		food.reset_food()
+		food.reset()
 		if snake:
 			food.spawn_food(snake.get_body_positions())
 	
@@ -309,12 +289,12 @@ func _play_food_particles() -> void:
 	
 	# 创建简单的粒子效果
 	var particle_count = 8
-	var food_world_pos = grid.grid_to_world(food.get_grid_position())
+	var food_world_pos = grid.grid_to_world(food.get_current_position())
 	
 	for i in range(particle_count):
 		var particle = ColorRect.new()
 		particle.size = Vector2(4, 4)
-		particle.color = GameColors.FOOD_NORMAL
+		particle.color = GameColors.FOOD_COLOR
 		particle.position = food_world_pos
 		add_child(particle)
 		
@@ -334,10 +314,8 @@ func _play_score_popup() -> void:
 	
 	# 创建分数标签
 	var score_label = Label.new()
-	score_label.text = "+" + str(food.get_food_value())
-	score_label.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_LARGE)
-	score_label.add_theme_color_override("font_color", GameColors.ACCENT_GREEN)
-	score_label.position = grid.grid_to_world(food.get_grid_position())
+	score_label.text = "+" + str(food.get_current_value())
+	score_label.position = grid.grid_to_world(food.get_current_position())
 	add_child(score_label)
 	
 	# 弹出动画
@@ -351,27 +329,8 @@ func _input(event: InputEvent) -> void:
 	if not is_initialized or not game_manager:
 		return
 	
-	# 方向输入
-	var direction = Vector2i.ZERO
-	if event.is_action_pressed("move_up"):
-		direction = Vector2i.UP
-	elif event.is_action_pressed("move_down"):
-		direction = Vector2i.DOWN
-	elif event.is_action_pressed("move_left"):
-		direction = Vector2i.LEFT
-	elif event.is_action_pressed("move_right"):
-		direction = Vector2i.RIGHT
-	
-	if direction != Vector2i.ZERO:
-		game_manager.handle_direction_input(direction)
-	
-	# 暂停输入
-	if event.is_action_pressed("pause"):
-		game_manager.toggle_pause()
-	
-	# 调试输入
-	if event.is_action_pressed("debug_restart"):
-		game_manager.start_game()
+	# 将输入传递给GameManager处理
+	game_manager._input(event)
 
 ## 获取游戏区域
 func get_game_area() -> Rect2:
@@ -397,7 +356,11 @@ func set_game_objects_visible(visible: bool) -> void:
 	if food:
 		food.visible = visible
 	if grid:
-		grid.set_visible(visible)
+		grid.visible = visible
+		# 同时更新Grid内部的show_grid状态
+		grid.show_grid = visible
+		grid.set_grid_lines_visible(visible)
+		grid.set_border_visible(visible)
 
 ## 暂停/恢复游戏对象
 func set_game_objects_paused(paused: bool) -> void:
@@ -419,14 +382,59 @@ func cleanup_scene() -> void:
 	# 重置游戏对象
 	_reset_game_objects()
 
+## 应用保存的设置
+func _apply_saved_settings() -> void:
+	if not save_manager:
+		return
+	
+	# 应用网格显示设置
+	var grid_visible = save_manager.get_setting("grid_visible", true)
+	if grid:
+		grid.visible = grid_visible
+		grid.show_grid = grid_visible
+		grid.set_grid_lines_visible(grid_visible)
+		grid.set_border_visible(grid_visible)
+		print("Applied grid visibility setting: ", grid_visible)
+	
+	# 应用音量设置
+	var volume = save_manager.get_setting("volume", 1.0)
+	var master_bus_index = AudioServer.get_bus_index("Master")
+	if master_bus_index != -1:
+		var db_value = linear_to_db(volume)
+		AudioServer.set_bus_volume_db(master_bus_index, db_value)
+		print("Applied volume setting: ", volume)
+	
+	# 应用全屏设置
+	var fullscreen = save_manager.get_setting("fullscreen", false)
+	if fullscreen:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		# 恢复到固定的窗口大小
+		_restore_window_size()
+	print("Applied fullscreen setting: ", fullscreen)
+
+## 恢复窗口大小
+func _restore_window_size() -> void:
+	# 从项目设置中获取窗口大小，或使用默认值
+	var window_width = ProjectSettings.get_setting("display/window/size/viewport_width", 800)
+	var window_height = ProjectSettings.get_setting("display/window/size/viewport_height", 600)
+	DisplayServer.window_set_size(Vector2i(window_width, window_height))
+	
+	# 将窗口居中
+	var screen_size = DisplayServer.screen_get_size()
+	var window_pos = Vector2i(
+		(screen_size.x - window_width) / 2,
+		(screen_size.y - window_height) / 2
+	)
+	DisplayServer.window_set_position(window_pos)
+
 ## 获取游戏统计信息
 func get_game_stats() -> Dictionary:
 	var stats = {}
 	
 	if game_manager:
-		stats["score"] = game_manager.get_score()
-		stats["level"] = game_manager.get_level()
-		stats["speed"] = game_manager.get_speed()
+		stats = game_manager.get_game_stats()
 	
 	if snake:
 		stats["snake_length"] = snake.get_length()

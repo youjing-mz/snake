@@ -7,8 +7,8 @@ class_name Grid
 extends Node2D
 
 # 网格属性
-var grid_width: int = Constants.GRID_WIDTH
-var grid_height: int = Constants.GRID_HEIGHT
+var grid_width: int = Constants.DEFAULT_GRID_WIDTH
+var grid_height: int = Constants.DEFAULT_GRID_HEIGHT
 var cell_size: int = Constants.GRID_SIZE
 
 # 渲染相关
@@ -17,12 +17,16 @@ var grid_lines: Node2D
 var border_lines: Node2D
 
 # 网格样式
+var show_grid: bool = true
 var show_grid_lines: bool = true
 var show_border: bool = true
 var grid_line_width: float = 1.0
 var border_width: float = GameSizes.BORDER_WIDTH
 
 func _ready() -> void:
+	# 根据当前窗口大小设置网格尺寸
+	_update_grid_size()
+	
 	# 创建背景
 	_create_background()
 	
@@ -34,7 +38,7 @@ func _ready() -> void:
 	if show_border:
 		_create_border()
 	
-	print("Grid initialized with size: ", grid_width, "x", grid_height)
+	print("Grid initialized with dynamic size: ", grid_width, "x", grid_height)
 
 ## 创建背景
 func _create_background() -> void:
@@ -146,6 +150,12 @@ func set_grid_lines_visible(visible: bool) -> void:
 	if grid_lines:
 		grid_lines.visible = visible
 
+## 切换网格可见性（设计文档接口）
+func toggle_grid_visibility() -> void:
+	show_grid = not show_grid
+	set_grid_lines_visible(show_grid)
+	set_border_visible(show_grid)
+
 ## 设置边框可见性
 func set_border_visible(visible: bool) -> void:
 	show_border = visible
@@ -214,6 +224,13 @@ func get_grid_info() -> Dictionary:
 		"pixel_height": grid_height * cell_size
 	}
 
+## 更新网格尺寸（根据窗口大小）
+func _update_grid_size() -> void:
+	var new_size = Constants.get_current_grid_size()
+	grid_width = new_size.x
+	grid_height = new_size.y
+	print("Grid size updated to: ", grid_width, "x", grid_height)
+
 ## 调整网格大小
 func resize_grid(new_width: int, new_height: int) -> void:
 	grid_width = new_width
@@ -223,6 +240,11 @@ func resize_grid(new_width: int, new_height: int) -> void:
 	_recreate_grid()
 	
 	print("Grid resized to: ", grid_width, "x", grid_height)
+
+## 根据窗口大小自动调整网格
+func auto_resize_to_window() -> void:
+	_update_grid_size()
+	_recreate_grid()
 
 ## 重新创建网格
 func _recreate_grid() -> void:
@@ -258,3 +280,8 @@ func set_border_color(color: Color) -> void:
 		for child in border_lines.get_children():
 			if child is Line2D:
 				child.default_color = color
+
+## 设置网格颜色（设计文档接口）
+func set_grid_color(color: Color) -> void:
+	set_grid_line_color(color)
+	set_border_color(color)

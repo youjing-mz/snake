@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3 uid="uid://c8y4n6x2m9qwe"]
+[gd_scene load_steps=6 format=3 uid="uid://c8y4n6x2naqwe"]
 
-[ext_resource type="Script" path="res://scripts/scenes/Game.gd" id="1_a7b8c"]
-[ext_resource type="Script" path="res://scripts/managers/GameManager.gd" id="2_d9e0f"]
-[ext_resource type="Script" path="res://scripts/managers/SceneManager.gd" id="3_g1h2i"]
-[ext_resource type="Script" path="res://scripts/managers/SaveManager.gd" id="4_j3k4l"]
+[ext_resource type="Script" uid="uid://67ke4br6fpx6" path="res://scripts/scenes/Game.gd" id="1_a7b8c"]
+[ext_resource type="Script" uid="uid://csmjkos8dwvcs" path="res://scripts/managers/GameManager.gd" id="2_d9e0f"]
+[ext_resource type="Script" uid="uid://dj6g0cvp0insu" path="res://scripts/managers/SceneManager.gd" id="3_g1h2i"]
+[ext_resource type="Script" uid="uid://bqg0uk5p5r8ga" path="res://scripts/managers/SaveManager.gd" id="4_j3k4l"]
+[ext_resource type="Script" uid="uid://cgh1ori8txi7q" path="res://scripts/ui/GameUI.gd" id="5_m5n6o"]
 
 [node name="Game" type="Node2D"]
 script = ExtResource("1_a7b8c")
@@ -28,6 +29,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("5_m5n6o")
 
 [node name="TopBar" type="HBoxContainer" parent="CanvasLayer/GameUI"]
 layout_mode = 1
@@ -92,8 +94,12 @@ horizontal_alignment = 1
 
 [node name="PauseHint" type="Label" parent="CanvasLayer/GameUI/PausePanel/PauseContainer"]
 layout_mode = 2
-text = "按空格键继续游戏"
+text = "按空格键或点击继续按钮"
 horizontal_alignment = 1
+
+[node name="ContinueButton" type="Button" parent="CanvasLayer/GameUI/PausePanel/PauseContainer"]
+layout_mode = 2
+text = "继续游戏"
 
 [node name="GameOverPanel" type="Panel" parent="CanvasLayer/GameUI"]
 visible = false

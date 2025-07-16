@@ -10,6 +10,7 @@ const PRIMARY_GREEN: Color = Color(0.153, 0.682, 0.376)  # #27AE60
 const PRIMARY_DARK: Color = Color(0.173, 0.243, 0.314)   # #2C3E50
 const ACCENT_RED: Color = Color(0.906, 0.298, 0.235)     # #E74C3C
 const ACCENT_BLUE: Color = Color(0.204, 0.596, 0.859)    # #3498DB
+const ACCENT_GREEN: Color = Color(0.247, 0.784, 0.620)    # #2ECC71
 
 # 中性色
 const WHITE: Color = Color(1.0, 1.0, 1.0)                # #FFFFFF

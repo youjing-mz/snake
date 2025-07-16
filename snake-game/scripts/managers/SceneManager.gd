@@ -13,7 +13,7 @@ enum SceneType { MENU, GAME, SETTINGS, GAME_OVER }
 
 # 场景路径映射
 const SCENE_PATHS: Dictionary = {
-	SceneType.MENU: "res://scenes/Menu.tscn",
+	SceneType.MENU: "res://scenes/Main.tscn",
 	SceneType.GAME: "res://scenes/Game.tscn",
 	SceneType.SETTINGS: "res://scenes/Settings.tscn",
 	SceneType.GAME_OVER: "res://scenes/GameOver.tscn"

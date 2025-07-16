@@ -25,6 +25,7 @@ SaveManager="*res://scripts/managers/SaveManager.gd"
 GameColors="*res://scripts/utils/GameColors.gd"
 GameSizes="*res://scripts/utils/GameSizes.gd"
 Constants="*res://scripts/utils/Constants.gd"
+CollisionDetector="*res://scripts/utils/CollisionDetector.gd"
 
 [display]
 

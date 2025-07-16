@@ -6,6 +6,9 @@
 class_name SettingsMenu
 extends Control
 
+# 信号定义
+signal back_to_menu_requested
+
 # UI节点引用
 @onready var back_button: Button
 @onready var volume_slider: HSlider
@@ -47,8 +50,8 @@ func _ready() -> void:
 
 ## 获取管理器引用
 func _get_manager_references() -> void:
-	scene_manager = get_tree().get_first_node_in_group("scene_manager")
-	save_manager = get_tree().get_first_node_in_group("save_manager")
+	scene_manager = SceneManager
+	save_manager = SaveManager
 	
 	if not scene_manager:
 		print("Warning: SceneManager not found")
@@ -60,12 +63,25 @@ func _setup_ui() -> void:
 	# 查找UI节点
 	_find_ui_nodes()
 	
-	# 如果找不到节点，创建基本UI
+	# 验证必要的UI节点是否存在
 	if not back_button:
-		_create_fallback_ui()
+		print("Warning: BackButton not found in scene")
+	if not volume_slider:
+		print("Warning: VolumeSlider not found in scene")
+	if not volume_label:
+		print("Warning: VolumeLabel not found in scene")
+	if not fullscreen_checkbox:
+		print("Warning: FullscreenCheckBox not found in scene")
+	if not grid_visible_checkbox:
+		print("Warning: GridVisibleCheckBox not found in scene")
+	if not difficulty_option:
+		print("Warning: DifficultyOption not found in scene")
+	if not reset_button:
+		print("Warning: ResetButton not found in scene")
+	if not apply_button:
+		print("Warning: ApplyButton not found in scene")
 	
-	# 设置UI样式
-	_setup_ui_styles()
+
 
 ## 查找UI节点
 func _find_ui_nodes() -> void:
@@ -78,154 +94,9 @@ func _find_ui_nodes() -> void:
 	reset_button = find_child("ResetButton") as Button
 	apply_button = find_child("ApplyButton") as Button
 
-## 创建备用UI
-func _create_fallback_ui() -> void:
-	print("Creating fallback SettingsMenu structure")
-	
-	# 主容器
-	var main_container = VBoxContainer.new()
-	main_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	main_container.add_theme_constant_override("separation", GameSizes.MARGIN_LARGE)
-	add_child(main_container)
-	
-	# 标题
-	var title_label = Label.new()
-	title_label.text = "游戏设置"
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_LARGE)
-	main_container.add_child(title_label)
-	
-	# 设置容器
-	var settings_container = VBoxContainer.new()
-	settings_container.add_theme_constant_override("separation", GameSizes.MARGIN_MEDIUM)
-	main_container.add_child(settings_container)
-	
-	# 音量设置
-	_create_volume_setting(settings_container)
-	
-	# 显示设置
-	_create_display_settings(settings_container)
-	
-	# 游戏设置
-	_create_game_settings(settings_container)
-	
-	# 按钮容器
-	var button_container = HBoxContainer.new()
-	button_container.add_theme_constant_override("separation", GameSizes.MARGIN_MEDIUM)
-	main_container.add_child(button_container)
-	
-	# 重置按钮
-	reset_button = Button.new()
-	reset_button.text = "重置默认"
-	reset_button.custom_minimum_size = Vector2(100, 40)
-	button_container.add_child(reset_button)
-	
-	# 应用按钮
-	apply_button = Button.new()
-	apply_button.text = "应用"
-	apply_button.custom_minimum_size = Vector2(100, 40)
-	button_container.add_child(apply_button)
-	
-	# 返回按钮
-	back_button = Button.new()
-	back_button.text = "返回"
-	back_button.custom_minimum_size = Vector2(100, 40)
-	button_container.add_child(back_button)
 
-## 创建音量设置
-func _create_volume_setting(parent: Control) -> void:
-	# 音量标签
-	var volume_title = Label.new()
-	volume_title.text = "音量设置"
-	parent.add_child(volume_title)
-	
-	# 音量容器
-	var volume_container = HBoxContainer.new()
-	volume_container.add_theme_constant_override("separation", GameSizes.MARGIN_MEDIUM)
-	parent.add_child(volume_container)
-	
-	# 音量标签
-	volume_label = Label.new()
-	volume_label.text = "音量: 100%"
-	volume_label.custom_minimum_size.x = 80
-	volume_container.add_child(volume_label)
-	
-	# 音量滑块
-	volume_slider = HSlider.new()
-	volume_slider.min_value = 0.0
-	volume_slider.max_value = 1.0
-	volume_slider.step = 0.01
-	volume_slider.value = 1.0
-	volume_slider.custom_minimum_size = Vector2(200, 20)
-	volume_container.add_child(volume_slider)
 
-## 创建显示设置
-func _create_display_settings(parent: Control) -> void:
-	# 显示标签
-	var display_title = Label.new()
-	display_title.text = "显示设置"
-	parent.add_child(display_title)
-	
-	# 全屏复选框
-	fullscreen_checkbox = CheckBox.new()
-	fullscreen_checkbox.text = "全屏模式"
-	parent.add_child(fullscreen_checkbox)
-	
-	# 网格可见复选框
-	grid_visible_checkbox = CheckBox.new()
-	grid_visible_checkbox.text = "显示网格"
-	grid_visible_checkbox.button_pressed = true
-	parent.add_child(grid_visible_checkbox)
 
-## 创建游戏设置
-func _create_game_settings(parent: Control) -> void:
-	# 游戏标签
-	var game_title = Label.new()
-	game_title.text = "游戏设置"
-	parent.add_child(game_title)
-	
-	# 难度容器
-	var difficulty_container = HBoxContainer.new()
-	difficulty_container.add_theme_constant_override("separation", GameSizes.MARGIN_MEDIUM)
-	parent.add_child(difficulty_container)
-	
-	# 难度标签
-	var difficulty_label = Label.new()
-	difficulty_label.text = "难度:"
-	difficulty_label.custom_minimum_size.x = 80
-	difficulty_container.add_child(difficulty_label)
-	
-	# 难度选项
-	difficulty_option = OptionButton.new()
-	difficulty_option.add_item("简单")
-	difficulty_option.add_item("普通")
-	difficulty_option.add_item("困难")
-	difficulty_option.selected = 1  # 默认普通难度
-	difficulty_option.custom_minimum_size = Vector2(120, 30)
-	difficulty_container.add_child(difficulty_option)
-
-## 设置UI样式
-func _setup_ui_styles() -> void:
-	# 设置标签样式
-	var labels = [volume_label]
-	for label in labels:
-		if label:
-			label.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_MEDIUM)
-			label.add_theme_color_override("font_color", GameColors.WHITE)
-	
-	# 设置按钮样式
-	var buttons = [back_button, reset_button, apply_button]
-	for button in buttons:
-		if button:
-			button.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_MEDIUM)
-			button.add_theme_color_override("font_color", GameColors.WHITE)
-	
-	# 设置复选框样式
-	var checkboxes = [fullscreen_checkbox, grid_visible_checkbox]
-	for checkbox in checkboxes:
-		if checkbox:
-			checkbox.add_theme_font_size_override("font_size", GameSizes.FONT_SIZE_MEDIUM)
-			checkbox.add_theme_color_override("font_color", GameColors.WHITE)
 
 ## 连接信号
 func _connect_signals() -> void:
@@ -261,7 +132,13 @@ func _initialize_audio() -> void:
 ## 加载设置
 func _load_settings() -> void:
 	if save_manager:
-		current_settings = save_manager.get_settings()
+		# 从SaveManager逐个获取设置项
+		current_settings = {
+			"volume": save_manager.get_setting("volume", 1.0),
+			"fullscreen": save_manager.get_setting("fullscreen", false),
+			"grid_visible": save_manager.get_setting("grid_visible", true),
+			"difficulty": save_manager.get_setting("difficulty", 1)
+		}
 		original_settings = current_settings.duplicate()
 	else:
 		# 默认设置
@@ -297,7 +174,16 @@ func _apply_settings_to_ui() -> void:
 	
 	# 难度设置
 	if difficulty_option:
-		difficulty_option.selected = current_settings.get("difficulty", 1)
+		var difficulty_value = current_settings.get("difficulty", 1)
+		# 确保是整数类型
+		if difficulty_value is String:
+			# 将字符串转换为索引
+			match difficulty_value:
+				"easy": difficulty_value = 0
+				"normal": difficulty_value = 1
+				"hard": difficulty_value = 2
+				_: difficulty_value = 1
+		difficulty_option.selected = difficulty_value
 
 ## 更新音量标签
 func _update_volume_label(value: float) -> void:
@@ -310,27 +196,19 @@ func _on_volume_changed(value: float) -> void:
 	current_settings["volume"] = value
 	_update_volume_label(value)
 	
-	# 实时应用音量
-	if master_bus_index != -1:
-		var db_value = linear_to_db(value)
-		AudioServer.set_bus_volume_db(master_bus_index, db_value)
+	# 不再实时应用音量，只在点击应用按钮时生效
 
 ## 全屏切换处理
 func _on_fullscreen_toggled(pressed: bool) -> void:
 	current_settings["fullscreen"] = pressed
 	
-	# 实时应用全屏设置
-	if pressed:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-	else:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	# 不再实时应用全屏设置，只在点击应用按钮时生效
 
 ## 网格可见切换处理
 func _on_grid_visible_toggled(pressed: bool) -> void:
 	current_settings["grid_visible"] = pressed
 	
-	# 通知游戏场景更新网格显示
-	_notify_grid_visibility_change(pressed)
+	# 不再实时应用网格设置，只在点击应用按钮时生效
 
 ## 难度选择处理
 func _on_difficulty_selected(index: int) -> void:
@@ -340,8 +218,23 @@ func _on_difficulty_selected(index: int) -> void:
 func _notify_grid_visibility_change(visible: bool) -> void:
 	# 查找游戏场景中的网格对象
 	var grid = get_tree().get_first_node_in_group("grid")
-	if grid and grid.has_method("set_visible"):
-		grid.set_visible(visible)
+	if grid:
+		# 直接设置visible属性
+		grid.visible = visible
+		# 同时更新Grid内部的show_grid状态
+		grid.show_grid = visible
+		grid.set_grid_lines_visible(visible)
+		grid.set_border_visible(visible)
+		print("Grid visibility changed to: ", visible)
+	else:
+		# 在菜单场景中查找背景网格
+		var menu_scene = get_tree().get_first_node_in_group("menu_scene")
+		if menu_scene and menu_scene.has_method("set_background_grid_visible"):
+			menu_scene.set_background_grid_visible(visible)
+			print("Background grid visibility changed to: ", visible)
+		else:
+			# 如果都找不到，设置会在应用时保存，游戏场景启动时会读取并应用
+			print("Grid not found - settings will be applied when game starts")
 
 ## 返回按钮点击
 func _on_back_button_pressed() -> void:
@@ -386,12 +279,14 @@ func _apply_current_settings() -> void:
 		var db_value = linear_to_db(current_settings.get("volume", 1.0))
 		AudioServer.set_bus_volume_db(master_bus_index, db_value)
 	
-	# 应用全屏
+	# 应用全屏设置
 	var fullscreen = current_settings.get("fullscreen", false)
 	if fullscreen:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		# 恢复到固定的窗口大小
+		_restore_window_size()
 	
 	# 应用网格可见性
 	var grid_visible = current_settings.get("grid_visible", true)
@@ -444,7 +339,13 @@ func _on_unsaved_dialog_confirmed() -> void:
 
 ## 返回菜单
 func _return_to_menu() -> void:
-	if scene_manager:
+	# 先发送信号，让父级处理（比如Menu.gd）
+	back_to_menu_requested.emit()
+	
+	# 如果信号没有被处理，则使用SceneManager
+	# 延迟一帧检查是否还在当前场景
+	await get_tree().process_frame
+	if scene_manager and is_inside_tree():
 		scene_manager.change_scene(SceneManager.SceneType.MENU)
 
 ## 处理输入
@@ -464,6 +365,22 @@ func set_setting(key: String, value) -> void:
 ## 获取特定设置值
 func get_setting(key: String, default_value = null):
 	return current_settings.get(key, default_value)
+
+## 恢复窗口大小
+func _restore_window_size() -> void:
+	# 从项目设置中获取窗口大小，或使用默认值
+	var window_width = ProjectSettings.get_setting("display/window/size/viewport_width", 800)
+	var window_height = ProjectSettings.get_setting("display/window/size/viewport_height", 600)
+	DisplayServer.window_set_size(Vector2i(window_width, window_height))
+	
+	# 将窗口居中
+	var screen_size = DisplayServer.screen_get_size()
+	var window_pos = Vector2i(
+		(screen_size.x - window_width) / 2,
+		(screen_size.y - window_height) / 2
+	)
+	DisplayServer.window_set_position(window_pos)
+	print("Window size restored to: ", window_width, "x", window_height)
 
 ## 重置UI状态
 func reset_ui() -> void:

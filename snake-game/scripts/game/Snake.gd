@@ -7,10 +7,12 @@ class_name Snake
 extends Node2D
 
 # 蛇相关信号
-signal food_eaten
+signal food_eaten(food_value: int)
 signal wall_hit
 signal self_hit
 signal direction_changed(new_direction: Vector2)
+
+# 使用CollisionDetector的碰撞类型枚举
 
 # 蛇身数据
 var body: Array[Vector2] = []
@@ -18,6 +20,7 @@ var direction: Vector2 = Vector2.RIGHT
 var next_direction: Vector2 = Vector2.RIGHT
 var is_growing: bool = false
 var is_alive: bool = true
+var move_interval: float = 0.2
 
 # 渲染相关
 var segment_nodes: Array[Node2D] = []
@@ -138,6 +141,10 @@ func set_direction(new_direction: Vector2) -> void:
 	next_direction = new_direction
 	direction_changed.emit(new_direction)
 
+## 改变方向（设计文档接口）
+func change_direction(new_direction: Vector2) -> void:
+	set_direction(new_direction)
+
 ## 移动蛇
 func move() -> void:
 	if not is_alive:
@@ -208,6 +215,19 @@ func check_self_collision() -> bool:
 			return true
 	return false
 
+## 检查碰撞（设计文档接口）
+func check_collision(head_pos: Vector2) -> CollisionDetector.CollisionType:
+	# 获取当前网格尺寸
+	var grid_size = Constants.get_current_grid_size()
+	# 使用CollisionDetector进行检测
+	return CollisionDetector.detect_collision(
+		head_pos, body, Vector2(-1, -1), false, grid_size.x, grid_size.y
+	)
+
+## 设置移动速度
+func set_move_speed(speed: float) -> void:
+	move_interval = speed
+
 ## 获取头部位置
 func get_head_position() -> Vector2:
 	if body.size() > 0:
@@ -244,6 +264,10 @@ func kill() -> void:
 	# 可以添加死亡动画效果
 	_play_death_animation()
 
+## 播放死亡动画（公开接口）
+func play_death_animation() -> void:
+	_play_death_animation()
+
 ## 播放死亡动画
 func _play_death_animation() -> void:
 	# 简单的闪烁效果
@@ -263,3 +287,9 @@ func get_direction() -> Vector2:
 ## 获取下一个移动方向
 func get_next_direction() -> Vector2:
 	return next_direction
+
+## 设置暂停状态
+func set_paused(paused: bool) -> void:
+	# 暂停时可以停止动画或其他效果
+	# 目前蛇的移动由GameManager的计时器控制，所以这里主要是预留接口
+	pass

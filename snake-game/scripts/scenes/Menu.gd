@@ -50,6 +50,9 @@ func _ready() -> void:
 	# 设置初始状态
 	_set_menu_state(MenuState.MAIN)
 	
+	# 应用保存的设置
+	_apply_saved_settings()
+	
 	# 标记为已初始化
 	is_initialized = true
 	
@@ -89,12 +92,12 @@ func _create_background_grid() -> void:
 	
 	# 计算网格位置
 	var viewport_size = get_viewport().get_visible_rect().size
-	var grid_width = Constants.GRID_WIDTH
-	var grid_height = Constants.GRID_HEIGHT
-	var cell_size = GameSizes.CELL_SIZE
-	
-	var total_width = grid_width * cell_size
-	var total_height = grid_height * cell_size
+	var grid_size = Constants.get_current_grid_size()
+	var grid_width = grid_size.x
+	var grid_height = grid_size.y
+
+	var total_width = grid_width * Constants.GRID_SIZE
+	var total_height = grid_height * Constants.GRID_SIZE
 	
 	background_grid.position = Vector2(
 		(viewport_size.x - total_width) / 2,
@@ -144,8 +147,8 @@ func _move_demo_snake() -> void:
 	
 	# 检查边界碰撞，改变方向
 	if not background_grid.is_valid_grid_position(next_pos) or demo_snake.is_position_occupied(next_pos):
-		# 随机选择新方向
-		var directions = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+		# 随机选择新方向（使用Vector2而不是Vector2i）
+		var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
 		directions.erase(current_direction)
 		directions.erase(-current_direction)  # 避免反向
 		
@@ -210,11 +213,11 @@ func _create_menu_ui() -> void:
 	# 查找现有的UI节点
 	_find_existing_ui_nodes()
 	
-	# 如果找不到现有节点，则创建新的
+	# 验证必要的UI节点是否存在
 	if not main_menu:
-		_create_main_menu()
+		print("Warning: MainMenuUI not found in scene")
 	if not settings_menu:
-		_create_settings_menu()
+		print("Warning: SettingsMenuUI not found in scene")
 
 ## 查找现有的UI节点
 func _find_existing_ui_nodes() -> void:
@@ -231,26 +234,7 @@ func _find_existing_ui_nodes() -> void:
 		settings_menu.visible = false
 		print("Found existing SettingsMenuUI")
 
-## 创建主菜单
-func _create_main_menu() -> void:
-	main_menu = MainMenu.new()
-	main_menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	main_menu.add_to_group("main_menu")
-	main_menu.z_index = 1  # 确保在背景之上
-	add_child(main_menu)
-	
-	print("MainMenu created")
 
-## 创建设置菜单
-func _create_settings_menu() -> void:
-	settings_menu = SettingsMenu.new()
-	settings_menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	settings_menu.add_to_group("settings_menu")
-	settings_menu.visible = false
-	settings_menu.z_index = 2  # 确保在主菜单之上
-	add_child(settings_menu)
-	
-	print("SettingsMenu created")
 
 ## 连接信号
 func _connect_signals() -> void:
@@ -291,22 +275,12 @@ func _connect_settings_menu_signals() -> void:
 	if not settings_menu:
 		return
 	
-	# 查找设置菜单中的按钮
-	var back_button = settings_menu.find_child("BackButton") as Button
-	var apply_button = settings_menu.find_child("ApplyButton") as Button
-	var reset_button = settings_menu.find_child("ResetButton") as Button
+	# Apply和Reset按钮让SettingsMenu类自己处理
+	# 这些按钮的信号已经在SettingsMenu.gd中连接了
 	
-	# 连接按钮信号
-	if back_button:
-		back_button.pressed.connect(_on_back_to_main)
-	if apply_button:
-		apply_button.pressed.connect(_on_apply_settings)
-	if reset_button:
-		reset_button.pressed.connect(_on_reset_settings)
-	
-	# 连接自定义信号（如果是SettingsMenu类实例）
-	if settings_menu.has_signal("back_to_main"):
-		settings_menu.back_to_main.connect(_on_back_to_main)
+	# 连接SettingsMenu的自定义信号
+	if settings_menu.has_signal("back_to_menu_requested"):
+		settings_menu.back_to_menu_requested.connect(_on_back_to_main)
 
 ## 设置菜单状态
 func _set_menu_state(new_state: MenuState) -> void:
@@ -380,17 +354,7 @@ func _on_quit_game() -> void:
 	print("Quit game requested")
 	_show_exit_confirmation()
 
-## 应用设置信号处理
-func _on_apply_settings() -> void:
-	print("Apply settings")
-	# 这里可以添加应用设置的逻辑
-	# 暂时只是打印信息
 
-## 重置设置信号处理
-func _on_reset_settings() -> void:
-	print("Reset settings")
-	# 这里可以添加重置设置的逻辑
-	# 暂时只是打印信息
 
 ## 处理输入
 func _input(event: InputEvent) -> void:
@@ -405,11 +369,6 @@ func _input(event: InputEvent) -> void:
 			MenuState.MAIN:
 				# 可以添加退出游戏确认
 				_show_exit_confirmation()
-	
-	# 调试快捷键
-	if event.is_action_pressed("debug_start_game"):
-		if scene_manager:
-			scene_manager.change_scene(SceneManager.SceneType.GAME)
 
 ## 显示退出确认
 func _show_exit_confirmation() -> void:
@@ -516,6 +475,57 @@ func play_menu_sound(sound_type: String) -> void:
 func set_menu_theme(theme_name: String) -> void:
 	# 这里可以添加主题切换逻辑
 	print("Setting menu theme: ", theme_name)
+
+## 应用保存的设置
+func _apply_saved_settings() -> void:
+	if not save_manager:
+		return
+	
+	# 应用网格显示设置
+	var grid_visible = save_manager.get_setting("grid_visible", true)
+	set_background_grid_visible(grid_visible)
+	
+	# 应用音量设置
+	var volume = save_manager.get_setting("volume", 1.0)
+	var master_bus_index = AudioServer.get_bus_index("Master")
+	if master_bus_index != -1:
+		var db_value = linear_to_db(volume)
+		AudioServer.set_bus_volume_db(master_bus_index, db_value)
+	
+	# 应用全屏设置
+	var fullscreen = save_manager.get_setting("fullscreen", false)
+	if fullscreen:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		# 恢复到固定的窗口大小
+		_restore_window_size()
+	
+	print("Applied saved settings to menu scene")
+
+## 恢复窗口大小
+func _restore_window_size() -> void:
+	# 从项目设置中获取窗口大小，或使用默认值
+	var window_width = ProjectSettings.get_setting("display/window/size/viewport_width", 800)
+	var window_height = ProjectSettings.get_setting("display/window/size/viewport_height", 600)
+	DisplayServer.window_set_size(Vector2i(window_width, window_height))
+	
+	# 将窗口居中
+	var screen_size = DisplayServer.screen_get_size()
+	var window_pos = Vector2i(
+		(screen_size.x - window_width) / 2,
+		(screen_size.y - window_height) / 2
+	)
+	DisplayServer.window_set_position(window_pos)
+
+## 设置背景网格可见性
+func set_background_grid_visible(visible: bool) -> void:
+	if background_grid:
+		background_grid.visible = visible
+		background_grid.show_grid = visible
+		background_grid.set_grid_lines_visible(visible)
+		background_grid.set_border_visible(visible)
+		print("Background grid visibility set to: ", visible)
 
 ## 获取菜单对象引用
 func get_main_menu() -> MainMenu:

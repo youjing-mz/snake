@@ -7,12 +7,12 @@ class_name Food
 extends Node2D
 
 # 食物相关信号
-signal food_spawned(position: Vector2)
-signal food_eaten(position: Vector2)
+signal food_spawned(position: Vector2, value: int)
+signal food_consumed(position: Vector2, value: int)
 
 # 食物位置
-var position_grid: Vector2
-var is_active: bool = false
+var current_position: Vector2 = Vector2(-1, -1)
+var active_state: bool = false
 
 # 渲染节点
 var food_visual: Node2D
@@ -22,7 +22,7 @@ enum FoodType { NORMAL, BONUS, SPECIAL }
 var food_type: FoodType = FoodType.NORMAL
 
 # 食物值
-var food_value: int = Constants.FOOD_SCORE
+var current_value: int = Constants.FOOD_SCORE
 
 # 动画相关
 var pulse_tween: Tween
@@ -104,6 +104,11 @@ func _setup_animations() -> void:
 
 ## 生成新食物
 func spawn_new_food(occupied_positions: Array[Vector2]) -> void:
+	spawn_food(occupied_positions)
+
+## 生成食物（设计文档接口）
+func spawn_food(occupied_positions: Array[Vector2]) -> void:
+	print("Food spawn_food called")
 	# 生成随机位置
 	var new_position = _generate_random_position(occupied_positions)
 	
@@ -112,8 +117,8 @@ func spawn_new_food(occupied_positions: Array[Vector2]) -> void:
 		return
 	
 	# 设置食物位置
-	position_grid = new_position
-	is_active = true
+	current_position = new_position
+	active_state = true
 	
 	# 更新视觉位置
 	_update_visual_position()
@@ -128,9 +133,11 @@ func spawn_new_food(occupied_positions: Array[Vector2]) -> void:
 	pulse_tween.play()
 	
 	# 发送信号
-	food_spawned.emit(position_grid)
+	food_spawned.emit(current_position, current_value)
 	
-	print("Food spawned at: ", position_grid)
+	print("Food spawned at: ", current_position)
+	print("Food visual visible: ", food_visual.visible)
+	print("Food visual position: ", food_visual.position)
 
 ## 生成随机位置
 func _generate_random_position(occupied_positions: Array[Vector2]) -> Vector2:
@@ -138,8 +145,9 @@ func _generate_random_position(occupied_positions: Array[Vector2]) -> Vector2:
 	var attempts = 0
 	
 	while attempts < max_attempts:
-		var x = randi() % Constants.GRID_WIDTH
-		var y = randi() % Constants.GRID_HEIGHT
+		var grid_size = Constants.get_current_grid_size()
+		var x = randi() % grid_size.x
+		var y = randi() % grid_size.y
 		var pos = Vector2(x, y)
 		
 		# 检查位置是否被占据
@@ -155,11 +163,12 @@ func _generate_random_position(occupied_positions: Array[Vector2]) -> Vector2:
 func _update_visual_position() -> void:
 	if food_visual:
 		# 转换网格坐标到像素坐标
-		var pixel_pos = _grid_to_pixel(position_grid)
+		var pixel_pos = _grid_to_pixel(current_position)
 		food_visual.position = pixel_pos
 
-## 网格坐标转像素坐标
+## 网格坐标转像素坐标（备用方法）
 func _grid_to_pixel(grid_pos: Vector2) -> Vector2:
+	# 由于Food节点已经设置了position偏移，这里只需要计算相对坐标
 	return grid_pos * Constants.GRID_SIZE + Vector2(Constants.GRID_SIZE / 2, Constants.GRID_SIZE / 2)
 
 ## 播放生成动画
@@ -181,44 +190,57 @@ func _play_eaten_animation() -> void:
 	
 	spawn_tween = create_tween()
 	
-	# 缩放和旋转动画
+	# 缩放和旋转动画（食物已经被隐藏，这里只是视觉效果）
 	spawn_tween.parallel().tween_property(food_visual, "scale", Vector2.ZERO, 0.2)
 	spawn_tween.parallel().tween_property(food_visual, "rotation", PI * 2, 0.2)
-	spawn_tween.tween_callback(_hide_food)
+	# 移除_hide_food回调，因为食物已经在consume_food中被隐藏
 
 ## 隐藏食物
 func _hide_food() -> void:
 	food_visual.visible = false
-	is_active = false
+	active_state = false
 	pulse_tween.pause()
 
 ## 食物被吃
 func eat_food() -> int:
-	if not is_active:
+	return consume_food()
+
+## 消费食物（设计文档接口）
+func consume_food() -> int:
+	if not active_state:
 		return 0
 	
-	print("Food eaten at: ", position_grid)
+	print("Food eaten at: ", current_position)
 	
-	# 播放被吃动画
+	# 立即隐藏食物，避免与新食物生成冲突
+	_hide_food()
+	
+	# 播放被吃动画（在隐藏后播放，避免视觉冲突）
 	_play_eaten_animation()
 	
 	# 发送信号
-	food_eaten.emit(position_grid)
+	food_consumed.emit(current_position, current_value)
 	
 	# 返回食物价值
-	return food_value
+	return current_value
 
-## 获取食物位置
-func get_food_position() -> Vector2:
-	return position_grid
+## 获取当前位置（设计文档接口）
+func get_current_position() -> Vector2:
+	return current_position
 
-## 检查食物是否激活
-func is_food_active() -> bool:
-	return is_active
 
-## 获取食物价值
-func get_food_value() -> int:
-	return food_value
+## 检查是否激活（设计文档接口）
+func is_active() -> bool:
+	return active_state
+
+## 检查碰撞（设计文档接口）
+func check_collision(position_to_check: Vector2) -> bool:
+	return active_state and position_to_check == current_position
+
+
+## 获取当前价值（设计文档接口）
+func get_current_value() -> int:
+	return current_value
 
 ## 设置食物类型
 func set_food_type(type: FoodType) -> void:
@@ -227,13 +249,13 @@ func set_food_type(type: FoodType) -> void:
 	# 根据类型设置不同的属性
 	match type:
 		FoodType.NORMAL:
-			food_value = Constants.FOOD_SCORE
+			current_value = Constants.FOOD_SCORE
 			_update_food_appearance(GameColors.FOOD_COLOR)
 		FoodType.BONUS:
-			food_value = Constants.FOOD_SCORE * 2
+			current_value = Constants.FOOD_SCORE * 2
 			_update_food_appearance(GameColors.ACCENT_BLUE)
 		FoodType.SPECIAL:
-			food_value = Constants.FOOD_SCORE * 5
+			current_value = Constants.FOOD_SCORE * 5
 			_update_food_appearance(GameColors.PRIMARY_GREEN)
 
 ## 更新食物外观
@@ -251,7 +273,7 @@ func update_display() -> void:
 
 ## 重置食物状态
 func reset() -> void:
-	is_active = false
+	active_state = false
 	food_visual.visible = false
 	pulse_tween.pause()
 	
@@ -259,6 +281,19 @@ func reset() -> void:
 		spawn_tween.kill()
 	
 	print("Food reset")
+
+## 设置暂停状态
+func set_paused(paused: bool) -> void:
+	if paused:
+		if pulse_tween:
+			pulse_tween.pause()
+		if spawn_tween:
+			spawn_tween.pause()
+	else:
+		if pulse_tween and active_state:
+			pulse_tween.play()
+		if spawn_tween:
+			spawn_tween.play()
 
 ## 销毁食物
 func destroy() -> void:
