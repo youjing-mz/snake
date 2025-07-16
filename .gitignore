@@ -1,0 +1,3 @@
+# 忽略 Godot 引擎生成的项目文件夹
+.godot/
+.DS_Store
