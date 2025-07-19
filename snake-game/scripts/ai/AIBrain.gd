@@ -74,6 +74,26 @@ func think(game_state: Dictionary) -> Vector2:
 		thinking_finished.emit()
 		return Vector2.ZERO
 	
+	# 检查是否可以直接吃掉食物
+	var food_position = game_state.get("food_position", Vector2(-1, -1))
+	if food_position.x >= 0 and food_position.y >= 0:
+		for direction in possible_directions:
+			var target_pos = current_head + direction
+			if target_pos == food_position:
+				# 可以直接吃掉食物，立即选择这个方向
+				var reasoning = "直接吃掉食物"
+				thinking_finished.emit()
+				decision_made.emit(direction, reasoning)
+				return direction
+		
+		# 如果无法直接吃掉食物，尝试朝向食物的方向移动
+		var food_direction = _get_direction_towards_food(current_head, food_position, possible_directions, game_state)
+		if food_direction != Vector2.ZERO:
+			var reasoning = "朝向食物移动"
+			thinking_finished.emit()
+			decision_made.emit(food_direction, reasoning)
+			return food_direction
+	
 	# 评估每个可能的方向
 	var evaluations: Array[Dictionary] = []
 	for direction in possible_directions:
@@ -93,6 +113,22 @@ func think(game_state: Dictionary) -> Vector2:
 	
 	# 生成决策理由
 	var reasoning = _generate_reasoning(best_evaluation)
+	
+	# 调试信息：打印决策详情
+	print("AIBrain Decision: ", chosen_direction, " - ", reasoning)
+	print("  Food position: ", food_position, " Distance: ", current_head.distance_to(food_position))
+	print("  Best score: ", best_evaluation.get("total_score", 0.0))
+	print("  Food score: ", best_evaluation.get("food_score", 0.0))
+	print("  Food bonus: ", best_evaluation.get("food_bonus", 0.0))
+	
+	# 打印所有方向的评估
+	print("  All directions evaluation:")
+	for eval in evaluations:
+		var dir = eval.get("direction", Vector2.ZERO)
+		var score = eval.get("total_score", 0.0)
+		var food_score = eval.get("food_score", 0.0)
+		var food_bonus = eval.get("food_bonus", 0.0)
+		print("    ", dir, ": total=", score, " food=", food_score, " bonus=", food_bonus)
 	
 	thinking_finished.emit()
 	decision_made.emit(chosen_direction, reasoning)
@@ -123,12 +159,22 @@ func evaluate_direction(direction: Vector2, game_state: Dictionary) -> Dictionar
 	var space_score = _calculate_space_score(target_position, game_state)
 	var future_safety_score = _calculate_future_safety_score(target_position, direction, game_state)
 	
+	# 检查这个方向是否朝向食物
+	var food_bonus = 0.0
+	var food_position = game_state.get("food_position", Vector2(-1, -1))
+	if food_position.x >= 0 and food_position.y >= 0:
+		var distance_before = current_head.distance_to(food_position)
+		var distance_after = target_position.distance_to(food_position)
+		if distance_after < distance_before:
+			food_bonus = 0.5  # 朝向食物给予额外奖励
+	
 	# 计算加权总分
 	var total_score = (
 		safety_score * DECISION_WEIGHTS.safety +
 		food_score * DECISION_WEIGHTS.food_distance +
 		space_score * DECISION_WEIGHTS.space_available +
-		future_safety_score * DECISION_WEIGHTS.future_safety
+		future_safety_score * DECISION_WEIGHTS.future_safety +
+		food_bonus  # 添加朝向食物的奖励
 	)
 	
 	return {
@@ -139,6 +185,7 @@ func evaluate_direction(direction: Vector2, game_state: Dictionary) -> Dictionar
 		"food_score": food_score,
 		"space_score": space_score,
 		"future_safety_score": future_safety_score,
+		"food_bonus": food_bonus,
 		"viable": true,
 		"confidence": _calculate_confidence(safety_score, space_score)
 	}
@@ -230,24 +277,35 @@ func _calculate_food_score(position: Vector2, game_state: Dictionary) -> float:
 	# 计算到食物的距离
 	var distance = position.distance_to(food_position)
 	
-	# 尝试寻找到食物的路径
-	var path_score = 0.0
-	if pathfinder:
-		var path = pathfinder.find_path(position, food_position, game_state)
-		if path.size() > 0:
-			# 路径长度越短评分越高
-			var path_length = pathfinder.calculate_path_length(path)
-			path_score = 1.0 / (1.0 + path_length * 0.1)
-		else:
-			# 如果找不到路径，基于直线距离评分
-			path_score = 1.0 / (1.0 + distance * 0.2)
-	else:
-		# 备用：基于曼哈顿距离
-		var manhattan_distance = abs(position.x - food_position.x) + abs(position.y - food_position.y)
-		path_score = 1.0 / (1.0 + manhattan_distance * 0.1)
+	# 如果就在食物旁边，给予最高评分
+	if distance <= 1.0:
+		return 1.0 * food_priority
 	
-	# 应用食物优先级
-	return path_score * food_priority
+	# 使用新的方向获取方法来评估食物可达性
+	var food_direction_score = 0.0
+	if pathfinder:
+		var next_direction = pathfinder.get_next_direction_to_target(position, food_position, game_state)
+		if next_direction != Vector2.ZERO:
+			# 如果找到了方向，给予较高评分
+			food_direction_score = 0.8
+		else:
+			# 如果找不到方向，给予较低评分
+			food_direction_score = 0.3
+	else:
+		# 备用：基于距离
+		food_direction_score = 1.0 / (1.0 + distance * 0.1)
+	
+	# 应用食物优先级，并增加近距离奖励
+	var final_score = food_direction_score * food_priority
+	if distance < 5.0:  # 距离食物5格以内给予额外奖励
+		final_score *= (1.0 + (5.0 - distance) * 0.1)
+	
+	# 考虑饥饿程度
+	var hunger_level = game_state.get("hunger_level", 0.0)
+	if hunger_level > 0.5:  # 饥饿时增加食物评分
+		final_score *= (1.0 + hunger_level * 0.5)
+	
+	return final_score
 
 ## 计算空间评分
 func _calculate_space_score(position: Vector2, game_state: Dictionary) -> float:
@@ -308,6 +366,7 @@ func _generate_reasoning(evaluation: Dictionary) -> String:
 	var food = evaluation.get("food_score", 0.0)
 	var space = evaluation.get("space_score", 0.0)
 	var future = evaluation.get("future_safety_score", 0.0)
+	var food_bonus = evaluation.get("food_bonus", 0.0)
 	
 	# 分析主要决策因素
 	if safety > 0.8:
@@ -319,6 +378,9 @@ func _generate_reasoning(evaluation: Dictionary) -> String:
 		reasoning_parts.append("接近食物")
 	elif food < 0.3:
 		reasoning_parts.append("远离食物")
+	
+	if food_bonus > 0:
+		reasoning_parts.append("朝向食物")
 	
 	if space > 0.7:
 		reasoning_parts.append("空间充裕")
@@ -366,6 +428,56 @@ func _calculate_time_diff(start_time: Dictionary, end_time: Dictionary) -> float
 	var start_ms = start_time.hour * 3600000 + start_time.minute * 60000 + start_time.second * 1000
 	var end_ms = end_time.hour * 3600000 + end_time.minute * 60000 + end_time.second * 1000
 	return float(end_ms - start_ms)
+
+## 获取朝向食物的方向
+func _get_direction_towards_food(current_head: Vector2, food_position: Vector2, possible_directions: Array[Vector2], game_state: Dictionary) -> Vector2:
+	if not pathfinder:
+		return Vector2.ZERO
+	
+	# 使用PathFinder获取到食物的下一个方向
+	var next_direction = pathfinder.get_next_direction_to_target(current_head, food_position, game_state)
+	
+	# 检查这个方向是否在可能的方向列表中
+	if next_direction in possible_directions:
+		print("AIBrain: Moving towards food with direction: ", next_direction)
+		return next_direction
+	
+	# 如果PathFinder的方向不可行，尝试简单的方向引导
+	var dx = food_position.x - current_head.x
+	var dy = food_position.y - current_head.y
+	
+	# 优先选择距离较大的方向
+	var preferred_directions: Array[Vector2] = []
+	
+	if abs(dx) > abs(dy):
+		# 水平距离更大
+		if dx > 0 and Vector2.RIGHT in possible_directions:
+			preferred_directions.append(Vector2.RIGHT)
+		elif dx < 0 and Vector2.LEFT in possible_directions:
+			preferred_directions.append(Vector2.LEFT)
+		
+		if dy > 0 and Vector2.DOWN in possible_directions:
+			preferred_directions.append(Vector2.DOWN)
+		elif dy < 0 and Vector2.UP in possible_directions:
+			preferred_directions.append(Vector2.UP)
+	else:
+		# 垂直距离更大
+		if dy > 0 and Vector2.DOWN in possible_directions:
+			preferred_directions.append(Vector2.DOWN)
+		elif dy < 0 and Vector2.UP in possible_directions:
+			preferred_directions.append(Vector2.UP)
+		
+		if dx > 0 and Vector2.RIGHT in possible_directions:
+			preferred_directions.append(Vector2.RIGHT)
+		elif dx < 0 and Vector2.LEFT in possible_directions:
+			preferred_directions.append(Vector2.LEFT)
+	
+	# 返回第一个可行的方向
+	if preferred_directions.size() > 0:
+		print("AIBrain: Using simple direction towards food: ", preferred_directions[0])
+		return preferred_directions[0]
+	
+	return Vector2.ZERO
 
 ## 更新决策权重
 func update_decision_weights(new_weights: Dictionary) -> void:

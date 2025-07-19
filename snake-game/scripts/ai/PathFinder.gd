@@ -206,10 +206,13 @@ func _is_walkable(position: Vector2, game_state: Dictionary) -> bool:
 	if position.x < 0 or position.x >= grid_width or position.y < 0 or position.y >= grid_height:
 		return false
 	
-	# 检查蛇身
+	# 检查蛇身（排除尾部，因为蛇移动时尾部会离开）
 	var snake_body = game_state.get("snake_body", [])
-	if position in snake_body:
-		return false
+	if snake_body.size() > 0:
+		# 排除蛇的尾部，因为蛇移动时尾部会离开当前位置
+		var body_without_tail = snake_body.slice(0, -1)
+		if position in body_without_tail:
+			return false
 	
 	return true
 
@@ -223,6 +226,89 @@ func calculate_path_length(path: Array[Vector2]) -> float:
 		length += path[i].distance_to(path[i + 1])
 	
 	return length
+
+## 获取到目标的下一个方向
+func get_next_direction_to_target(from: Vector2, to: Vector2, game_state: Dictionary) -> Vector2:
+	# 首先尝试直接寻路
+	var path = find_path(from, to, game_state)
+	
+	if path.size() > 0:
+		# 返回路径的第一步方向
+		var next_pos = path[0]
+		var direction = next_pos - from
+		print("PathFinder: Found path to food, next direction: ", direction)
+		return direction
+	
+	# 如果找不到路径，使用简单的方向引导
+	return _get_simple_direction_to_target(from, to, game_state)
+
+## 简单的方向引导（当A*失败时使用）
+func _get_simple_direction_to_target(from: Vector2, to: Vector2, game_state: Dictionary) -> Vector2:
+	var dx = to.x - from.x
+	var dy = to.y - from.y
+	
+	# 优先选择距离较大的方向
+	var possible_directions: Array[Vector2] = []
+	
+	if abs(dx) > abs(dy):
+		# 水平距离更大，优先水平移动
+		if dx > 0:
+			possible_directions.append(Vector2.RIGHT)
+		else:
+			possible_directions.append(Vector2.LEFT)
+		
+		# 然后尝试垂直移动
+		if dy > 0:
+			possible_directions.append(Vector2.DOWN)
+		elif dy < 0:
+			possible_directions.append(Vector2.UP)
+	else:
+		# 垂直距离更大，优先垂直移动
+		if dy > 0:
+			possible_directions.append(Vector2.DOWN)
+		else:
+			possible_directions.append(Vector2.UP)
+		
+		# 然后尝试水平移动
+		if dx > 0:
+			possible_directions.append(Vector2.RIGHT)
+		elif dx < 0:
+			possible_directions.append(Vector2.LEFT)
+	
+	# 检查哪个方向是可行的
+	for direction in possible_directions:
+		var test_pos = from + direction
+		if _is_walkable(test_pos, game_state):
+			print("PathFinder: Using simple direction to food: ", direction)
+			return direction
+	
+	# 如果所有方向都不可行，寻找安全方向
+	print("PathFinder: No direct path to food, using safe direction")
+	return find_safe_direction(from, game_state)
+
+## 检查位置是否可行走（增强版）
+func _is_walkable_enhanced(position: Vector2, game_state: Dictionary) -> bool:
+	var grid_width = game_state.get("grid_width", 40)
+	var grid_height = game_state.get("grid_height", 30)
+	
+	# 检查边界
+	if position.x < 0 or position.x >= grid_width or position.y < 0 or position.y >= grid_height:
+		return false
+	
+	# 检查蛇身（排除尾部，因为蛇移动时尾部会离开）
+	var snake_body = game_state.get("snake_body", [])
+	if snake_body.size() > 0:
+		# 排除蛇的尾部，因为蛇移动时尾部会离开当前位置
+		var body_without_tail = snake_body.slice(0, -1)
+		if position in body_without_tail:
+			return false
+	
+	# 额外检查：确保这个位置不会立即导致死路
+	var neighbors = get_neighbors(position, game_state)
+	if neighbors.size() <= 1:  # 如果只有一个或没有邻居，可能是死路
+		return false
+	
+	return true
 
 ## 优化路径（移除不必要的节点）
 func optimize_path(path: Array[Vector2], game_state: Dictionary) -> Array[Vector2]:

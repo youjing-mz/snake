@@ -61,12 +61,12 @@ const DIFFICULTY_CONFIGS: Dictionary = {
 		"error_rate": 0.01,
 		"look_ahead_steps": 8,
 		"risk_tolerance": 0.2,
-		"food_priority": 1.0,
+		"food_priority": 1.5,  # 增加食物优先级
 		"decision_weights": {
-			"safety": 0.7,
-			"food_distance": 1.0,
-			"space_available": 0.8,
-			"future_safety": 1.2
+			"safety": 0.6,      # 稍微降低安全性权重
+			"food_distance": 1.5,  # 大幅增加食物距离权重
+			"space_available": 0.6,
+			"future_safety": 1.0
 		}
 	}
 }
@@ -91,6 +91,8 @@ var score: int = 0
 var foods_eaten: int = 0
 var total_moves: int = 0
 var successful_moves: int = 0
+var last_food_time: float = 0.0  # 上次吃到食物的时间
+var hunger_level: float = 0.0    # 饥饿程度
 
 # 错误处理
 var last_error_time: float = 0.0
@@ -263,11 +265,17 @@ func update_score(points: int) -> void:
 	score += points
 	if points > 0:
 		foods_eaten += 1
+		last_food_time = Time.get_time_dict_from_system().hour * 3600 + Time.get_time_dict_from_system().minute * 60 + Time.get_time_dict_from_system().second
+		hunger_level = 0.0  # 重置饥饿程度
+		print("AIPlayer: Food eaten! Hunger reset.")
 
 ## 获取当前游戏状态
 func _get_current_game_state() -> Dictionary:
 	if not ai_snake:
 		return {}
+	
+	# 更新饥饿程度
+	_update_hunger_level()
 	
 	# 获取网格信息
 	var grid_size = Constants.get_grid_size()
@@ -278,7 +286,8 @@ func _get_current_game_state() -> Dictionary:
 		"snake_body": ai_snake.get_body_positions(),
 		"current_direction": ai_snake.get_direction(),
 		"grid_width": grid_size.x,
-		"grid_height": grid_size.y
+		"grid_height": grid_size.y,
+		"hunger_level": hunger_level  # 添加饥饿程度
 	}
 	
 	# 获取食物位置（从游戏场景中）
@@ -290,6 +299,16 @@ func _get_current_game_state() -> Dictionary:
 	
 	return game_state
 
+## 更新饥饿程度
+func _update_hunger_level() -> void:
+	if last_food_time > 0:
+		var current_time = Time.get_time_dict_from_system().hour * 3600 + Time.get_time_dict_from_system().minute * 60 + Time.get_time_dict_from_system().second
+		var time_since_food = current_time - last_food_time
+		hunger_level = min(1.0, time_since_food / 10.0)  # 10秒后达到最大饥饿
+		
+		if hunger_level > 0.8:
+			print("AIPlayer: Very hungry! Hunger level: ", hunger_level)
+
 ## 重置统计数据
 func _reset_stats() -> void:
 	survival_time = 0.0
@@ -298,6 +317,8 @@ func _reset_stats() -> void:
 	total_moves = 0
 	successful_moves = 0
 	consecutive_errors = 0
+	last_food_time = 0.0
+	hunger_level = 0.0
 
 ## 检查是否应该产生错误
 func _should_make_error() -> bool:
