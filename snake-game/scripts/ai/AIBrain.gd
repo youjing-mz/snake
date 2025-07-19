@@ -34,10 +34,24 @@ var decision_confidence: float = 0.0 # 决策置信度
 var recent_decisions: Array[Dictionary] = []
 const MAX_DECISION_HISTORY: int = 10
 
+# 位置历史（避免死循环）
+var position_history: Array[Vector2] = []
+const MAX_POSITION_HISTORY: int = 12  # 增加历史长度
+var loop_detection_threshold: int = 2  # 降低阈值，更敏感地检测循环
+
+# 反循环状态
+var anti_loop_mode: bool = false
+var anti_loop_steps_remaining: int = 0
+const ANTI_LOOP_DURATION: int = 8  # 反循环模式持续8步
+
 # 性能监控
 var last_decision_time: float = 0.0
 var total_decisions: int = 0
 var successful_decisions: int = 0
+
+# 调试信息存储
+var last_decision_scores: Dictionary = {}
+var last_evaluation_details: Dictionary = {}
 
 func _ready() -> void:
 	# 初始化AI组件
@@ -69,6 +83,28 @@ func think(game_state: Dictionary) -> Vector2:
 	var current_direction = game_state.get("current_direction", Vector2.RIGHT)
 	var possible_directions = get_possible_directions(current_direction)
 	
+	# 更新位置历史并检查循环
+	_update_position_history(current_head)
+	var is_in_loop = _detect_position_loop()
+	
+	# 调试信息：显示位置历史
+	if position_history.size() >= 4:
+		var recent = position_history.slice(-4)
+		print("AIBrain: 最近4个位置: ", recent)
+	
+	if is_in_loop:
+		print("AIBrain: 检测到位置循环，启动反循环模式")
+		# 启动反循环模式
+		anti_loop_mode = true
+		anti_loop_steps_remaining = ANTI_LOOP_DURATION
+		# 不清空历史，而是保留用于持续监控
+		# 选择一个随机方向
+		possible_directions.shuffle()
+		var random_direction = possible_directions[0]
+		thinking_finished.emit()
+		decision_made.emit(random_direction, "反循环模式: 随机移动")
+		return random_direction
+	
 	if possible_directions.is_empty():
 		print("AIBrain: No possible directions!")
 		thinking_finished.emit()
@@ -82,27 +118,54 @@ func think(game_state: Dictionary) -> Vector2:
 			if target_pos == food_position:
 				# 可以直接吃掉食物，立即选择这个方向
 				var reasoning = "直接吃掉食物"
+				var direct_scores = {"direct_food": 1.0, "total": 1.0}
+				_update_decision_scores(direction, direct_scores)
 				thinking_finished.emit()
 				decision_made.emit(direction, reasoning)
 				return direction
 		
 		# 如果无法直接吃掉食物，尝试朝向食物的方向移动
-		var food_direction = _get_direction_towards_food(current_head, food_position, possible_directions, game_state)
-		if food_direction != Vector2.ZERO:
-			var reasoning = "朝向食物移动"
-			thinking_finished.emit()
-			decision_made.emit(food_direction, reasoning)
-			return food_direction
+		# 但只有在没有检测到循环且不在反循环模式下才这样做
+		if not is_in_loop and not anti_loop_mode:
+			var food_direction = _get_direction_towards_food(current_head, food_position, possible_directions, game_state)
+			if food_direction != Vector2.ZERO:
+				# 检查这个方向是否会导致循环
+				var next_pos = current_head + food_direction
+				if _would_create_loop(next_pos):
+					print("AIBrain: 朝向食物的方向会造成循环，使用综合评估")
+				else:
+					var reasoning = "朝向食物移动"
+					var food_scores = {"food_direction": 0.8, "total": 0.8}
+					_update_decision_scores(food_direction, food_scores)
+					thinking_finished.emit()
+					decision_made.emit(food_direction, reasoning)
+					return food_direction
 	
 	# 评估每个可能的方向
 	var evaluations: Array[Dictionary] = []
 	for direction in possible_directions:
 		var evaluation = evaluate_direction(direction, game_state)
+		
+		# 在反循环模式下，调整评估权重
+		if anti_loop_mode:
+			# 降低朝向食物的权重，增加安全性权重
+			var food_score = evaluation.get("food_score", 0.0)
+			var safety_score = evaluation.get("safety_score", 0.0)
+			var total_score = safety_score * 2.0 + food_score * 0.3  # 大幅提高安全性权重
+			evaluation["total_score"] = total_score
+			evaluation["anti_loop_adjusted"] = true
+		
 		evaluations.append(evaluation)
+	
+	# 更新评估详情（用于调试）
+	_update_evaluation_details(possible_directions, evaluations)
 	
 	# 选择最佳方向
 	var best_evaluation = _select_best_direction(evaluations)
 	var chosen_direction = best_evaluation.get("direction", Vector2.ZERO)
+	
+	# 更新决策评分（用于调试）
+	_update_decision_scores(chosen_direction, best_evaluation)
 	
 	# 记录决策
 	_record_decision(best_evaluation, game_state)
@@ -129,6 +192,15 @@ func think(game_state: Dictionary) -> Vector2:
 		var food_score = eval.get("food_score", 0.0)
 		var food_bonus = eval.get("food_bonus", 0.0)
 		print("    ", dir, ": total=", score, " food=", food_score, " bonus=", food_bonus)
+	
+	# 处理反循环模式
+	if anti_loop_mode:
+		anti_loop_steps_remaining -= 1
+		print("AIBrain: 反循环模式，剩余步数: ", anti_loop_steps_remaining)
+		if anti_loop_steps_remaining <= 0:
+			anti_loop_mode = false
+			_clear_position_history()  # 现在才清空历史
+			print("AIBrain: 退出反循环模式，历史已清空")
 	
 	thinking_finished.emit()
 	decision_made.emit(chosen_direction, reasoning)
@@ -429,7 +501,7 @@ func _calculate_time_diff(start_time: Dictionary, end_time: Dictionary) -> float
 	var end_ms = end_time.hour * 3600000 + end_time.minute * 60000 + end_time.second * 1000
 	return float(end_ms - start_ms)
 
-## 获取朝向食物的方向
+## 获取朝向食物的方向（带循环检测）
 func _get_direction_towards_food(current_head: Vector2, food_position: Vector2, possible_directions: Array[Vector2], game_state: Dictionary) -> Vector2:
 	if not pathfinder:
 		return Vector2.ZERO
@@ -437,10 +509,14 @@ func _get_direction_towards_food(current_head: Vector2, food_position: Vector2, 
 	# 使用PathFinder获取到食物的下一个方向
 	var next_direction = pathfinder.get_next_direction_to_target(current_head, food_position, game_state)
 	
-	# 检查这个方向是否在可能的方向列表中
+	# 检查这个方向是否在可能的方向列表中，并且不会造成循环
 	if next_direction in possible_directions:
-		print("AIBrain: Moving towards food with direction: ", next_direction)
-		return next_direction
+		var next_pos = current_head + next_direction
+		if not _would_create_loop(next_pos):
+			print("AIBrain: Moving towards food with direction: ", next_direction)
+			return next_direction
+		else:
+			print("AIBrain: PathFinder方向会造成循环，尝试其他方向")
 	
 	# 如果PathFinder的方向不可行，尝试简单的方向引导
 	var dx = food_position.x - current_head.x
@@ -472,11 +548,15 @@ func _get_direction_towards_food(current_head: Vector2, food_position: Vector2, 
 		elif dx < 0 and Vector2.LEFT in possible_directions:
 			preferred_directions.append(Vector2.LEFT)
 	
-	# 返回第一个可行的方向
-	if preferred_directions.size() > 0:
-		print("AIBrain: Using simple direction towards food: ", preferred_directions[0])
-		return preferred_directions[0]
+	# 返回第一个可行且不会造成循环的方向
+	for direction in preferred_directions:
+		var next_pos = current_head + direction
+		if not _would_create_loop(next_pos):
+			print("AIBrain: Using simple direction towards food: ", direction)
+			return direction
 	
+	# 如果所有朝向食物的方向都会造成循环，返回空向量让AI使用综合评估
+	print("AIBrain: 所有朝向食物的方向都会造成循环，放弃简单路径")
 	return Vector2.ZERO
 
 ## 更新决策权重
@@ -518,3 +598,79 @@ func analyze_recent_performance() -> Dictionary:
 		"recent_decisions_count": recent_decisions.size(),
 		"performance": "good" if avg_confidence > 0.6 else "needs_improvement"
 	}
+
+## 获取最近决策的评分详情
+func get_last_decision_scores() -> Dictionary:
+	return last_decision_scores
+
+## 获取最近决策的评估详情
+func get_last_evaluation_details() -> Dictionary:
+	return last_evaluation_details
+
+## 更新决策评分（在做决策时调用）
+func _update_decision_scores(direction: Vector2, scores: Dictionary) -> void:
+	last_decision_scores = {
+		"direction": direction,
+		"safety_score": scores.get("safety", 0.0),
+		"food_score": scores.get("food_distance", 0.0),
+		"space_score": scores.get("space_available", 0.0),
+		"future_score": scores.get("future_safety", 0.0),
+		"total_score": scores.get("total", 0.0),
+		"timestamp": Time.get_ticks_msec() / 1000.0
+	}
+
+## 更新评估详情
+func _update_evaluation_details(all_directions: Array, evaluations: Array) -> void:
+	last_evaluation_details = {
+		"evaluated_directions": all_directions,
+		"direction_scores": evaluations,
+		"best_direction": evaluations[0] if evaluations.size() > 0 else {},
+		"alternatives": evaluations.slice(1, min(3, evaluations.size())),
+		"evaluation_time": Time.get_ticks_msec() / 1000.0
+	}
+
+## 更新位置历史
+func _update_position_history(position: Vector2) -> void:
+	position_history.append(position)
+	
+	# 限制历史长度
+	if position_history.size() > MAX_POSITION_HISTORY:
+		position_history.remove_at(0)
+
+## 检测位置循环
+func _detect_position_loop() -> bool:
+	if position_history.size() < 6:
+		return false
+	
+	# 检查最近8步中是否有重复的位置模式
+	var recent_positions = position_history.slice(-8)
+	
+	# 简单检测：如果当前位置在最近4步中出现过，就认为是循环
+	var current_pos = recent_positions[-1]  # 最新位置
+	var earlier_positions = recent_positions.slice(0, -1)  # 除了最新位置的其他位置
+	
+	for i in range(earlier_positions.size()):
+		if earlier_positions[i].distance_to(current_pos) < 0.1:
+			print("AIBrain: 检测到循环 - 当前位置 ", current_pos, " 在 ", i+1, " 步前出现过")
+			return true
+	
+	return false
+
+## 清空位置历史
+func _clear_position_history() -> void:
+	position_history.clear()
+	print("AIBrain: 位置历史已清空")
+
+## 检查某个位置是否会造成循环
+func _would_create_loop(position: Vector2) -> bool:
+	if position_history.size() < 3:
+		return false
+	
+	# 简单检测：如果这个位置在最近4步中出现过，认为会造成循环
+	var recent_positions = position_history.slice(-4)
+	for pos in recent_positions:
+		if pos.distance_to(position) < 0.1:  # 基本相同位置
+			print("AIBrain: 预测循环 - 位置 ", position, " 在最近历史中出现过")
+			return true
+	
+	return false

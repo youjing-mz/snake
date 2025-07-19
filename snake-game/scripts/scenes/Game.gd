@@ -15,7 +15,7 @@ extends Node2D
 # AI系统引用
 var ai_player: AIPlayer
 var ai_snake: Snake
-var ai_debug_visualizer: AIDebugVisualizer
+# AI调试可视化已整合到调试面板中
 
 # 管理器引用
 var game_manager: GameManager
@@ -274,7 +274,7 @@ func _reset_game_objects() -> void:
 	
 	# 重置UI
 	if game_ui:
-		game_ui.reset_ui()
+		game_ui.reset()
 	
 	# 重新初始化AI系统（如果是AI模式）
 	if is_ai_battle_mode:
@@ -517,7 +517,68 @@ func _create_ai_system() -> void:
 	
 	# 创建AI调试可视化器（如果启用）
 	if ai_config.get("debug_enabled", false):
-		_create_ai_debug_visualizer()
+		# AI调试可视化已整合到GameUI的调试面板中
+		pass
+	
+	# 连接AI系统到UI调试面板
+	_connect_ai_to_debug_panel()
+
+## 连接AI系统到调试面板
+func _connect_ai_to_debug_panel() -> void:
+	if not game_ui or not ai_player:
+		return
+	
+	# 设置GameUI的AI玩家引用
+	game_ui.set_ai_player(ai_player)
+	
+	# 连接AI事件到UI更新
+	if ai_player.has_signal("decision_made"):
+		ai_player.decision_made.connect(_on_ai_decision_for_ui)
+	if ai_player.has_signal("performance_updated"):
+		ai_player.performance_updated.connect(_on_ai_performance_for_ui)
+	if ai_player.has_signal("behavior_analyzed"):
+		ai_player.behavior_analyzed.connect(_on_ai_behavior_for_ui)
+	if ai_player.has_signal("risk_assessed"):
+		ai_player.risk_assessed.connect(_on_ai_risk_for_ui)
+	if ai_player.has_signal("path_calculated"):
+		ai_player.path_calculated.connect(_on_ai_path_for_ui)
+
+## AI决策信号处理（用于UI更新）
+func _on_ai_decision_for_ui(direction: Vector2, reasoning: String, confidence: float, scores: Dictionary) -> void:
+	if game_ui and game_ui.has_method("update_ai_decision"):
+		game_ui.update_ai_decision({
+			"direction": direction,
+			"reasoning": reasoning, 
+			"confidence": confidence,
+			"scores": scores
+		})
+
+## AI性能更新信号处理
+func _on_ai_performance_for_ui(metrics: Dictionary) -> void:
+	if game_ui and game_ui.has_method("update_ai_metrics"):
+		game_ui.update_ai_metrics(metrics)
+
+## AI行为分析信号处理
+func _on_ai_behavior_for_ui(behavior_data: Dictionary) -> void:
+	if game_ui and game_ui.has_method("update_ai_behavior"):
+		game_ui.update_ai_behavior(behavior_data)
+
+## AI风险评估信号处理
+func _on_ai_risk_for_ui(risk_data: Dictionary) -> void:
+	if game_ui and game_ui.has_method("update_ai_risk"):
+		game_ui.update_ai_risk(risk_data)
+
+## AI路径规划信号处理
+func _on_ai_path_for_ui(path_data: Dictionary) -> void:
+	if game_ui and game_ui.has_method("update_ai_path"):
+		game_ui.update_ai_path(path_data)
+
+## 设置AI可视化选项（由GameUI调用）
+func set_ai_visualization_option(option: String, enabled: bool) -> void:
+	# AI可视化选项现在通过统一调试面板处理
+	if game_ui and game_ui.ai_debug_panel:
+		# 可视化选项通过调试面板的信号处理
+		pass
 
 ## 创建AI蛇
 func _create_ai_snake() -> void:
@@ -615,12 +676,22 @@ func _check_ai_collisions() -> void:
 	if not ai_snake or not grid:
 		return
 	
+	# 检查CollisionDetector是否可用
+	if not CollisionDetector:
+		print("Error: CollisionDetector not available")
+		return
+	
 	# 使用CollisionDetector进行综合碰撞检测
+	var head_pos = ai_snake.get_head_position()
+	var body_pos = ai_snake.get_body_positions()
+	var food_pos = food.get_current_position() if food else Vector2(-1, -1)
+	var food_active = food.is_active() if food else false
+	
 	var collision_result = CollisionDetector.detect_collision(
-		ai_snake.get_head_position(),
-		ai_snake.get_body_positions(),
-		food.get_current_position() if food else Vector2(-1, -1),
-		food.is_active() if food else false,
+		head_pos,
+		body_pos,
+		food_pos,
+		food_active,
 		grid.grid_width,
 		grid.grid_height
 	)
@@ -667,34 +738,11 @@ func _handle_ai_food_eaten() -> void:
 	if food:
 		food.spawn_food(snake.get_body_positions() + ai_snake.get_body_positions())
 
-## 创建AI调试可视化器
-func _create_ai_debug_visualizer() -> void:
-	ai_debug_visualizer = AIDebugVisualizer.new()
-	ai_debug_visualizer.name = "AIDebugVisualizer"
+## AI调试可视化已整合到统一调试面板中
+# 此方法已不再需要，功能已移至AIDebugPanel
 	
-	# 设置AI玩家引用
-	ai_debug_visualizer.set_ai_player(ai_player)
-	
-	# 设置位置到游戏区域
-	ai_debug_visualizer.position = game_area_rect.position
-	
-	# 启用调试可视化
-	ai_debug_visualizer.toggle_debug_visualization()
-	
-	# 设置可视化选项
-	ai_debug_visualizer.set_visualization_options({
-		"show_path": true,
-		"show_safety_zones": true,
-		"show_decision_scores": true,
-		"show_thinking_process": true
-	})
-	
-	# 添加到场景
-	add_child(ai_debug_visualizer)
-	
-	print("AI debug visualizer created and enabled")
-	print("AI debug visualizer position: ", ai_debug_visualizer.position)
-	print("AI debug visualizer visible: ", ai_debug_visualizer.visible)
+	# AI调试可视化已整合到统一调试面板中
+	print("AI debug visualization integrated into unified debug panel")
 
 ## AI决策信号处理
 func _on_ai_decision_made(direction: Vector2, reasoning: String) -> void:
@@ -720,9 +768,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	
 	# 调试快捷键
 	if event.is_action_pressed("ui_accept") and Input.is_action_pressed("ui_cancel"):
-		# Ctrl+Enter: 切换AI调试可视化
-		if ai_debug_visualizer:
-			ai_debug_visualizer.toggle_debug_visualization()
+		# Ctrl+Enter: 切换AI调试面板
+		if game_ui and game_ui.ai_debug_panel:
+			game_ui.ai_debug_panel.toggle_debug_display()
+			print("快捷键: 切换AI调试面板")
+	
+	# F1键：显示/隐藏AI调试面板
+	if event.is_action_pressed("ui_cancel"):
+		# ESC键: 切换AI调试面板
+		if game_ui and game_ui.ai_debug_panel:
+			game_ui.ai_debug_panel.toggle_debug_display()
+			print("ESC键: 切换AI调试面板")
 	
 	if event.is_action_pressed("ui_right") and Input.is_action_pressed("ui_cancel"):
 		# Ctrl+Right: 强制AI立即决策
@@ -745,9 +801,7 @@ func _cleanup_ai_system() -> void:
 		ai_snake.queue_free()
 		ai_snake = null
 	
-	if ai_debug_visualizer:
-		ai_debug_visualizer.queue_free()
-		ai_debug_visualizer = null
+	# AI调试可视化已整合到调试面板中，无需单独清理
 	
 	print("AI system cleaned up")
 
@@ -762,6 +816,34 @@ func _reinitialize_ai_system() -> void:
 	_create_ai_system()
 	
 	print("AI system reinitialized")
+
+## 强制启用AI调试模式（用于测试）
+func _force_enable_ai_debug() -> void:
+	print("🔧 强制启用AI调试模式...")
+	
+	# 确保设置AI调试模式
+	if has_node("/root/SaveManager"):
+		var save_manager = get_node("/root/SaveManager")
+		save_manager.set_setting("ai_debug_enabled", true)
+		save_manager.set_setting("game_mode", "ai_battle")
+		print("✅ 已设置AI调试配置")
+	
+	# 如果GameUI存在且没有调试面板，重新创建
+	if game_ui:
+		game_ui.ai_debug_enabled = true
+		if not game_ui.ai_debug_panel:
+			game_ui._create_ai_debug_panel()
+			print("✅ 已创建AI调试面板")
+		
+		# 确保调试面板显示
+		if game_ui.ai_debug_panel:
+			game_ui.ai_debug_panel.show_debug_panel()
+			print("✅ 调试面板已显示")
+		
+		# 如果AI玩家存在，连接调试面板
+		if ai_player:
+			game_ui._connect_ai_debug_panel()
+			print("✅ 已连接AI调试面板")
 
 ## 场景退出时清理
 func _exit_tree() -> void:

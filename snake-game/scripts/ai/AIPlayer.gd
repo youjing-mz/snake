@@ -12,6 +12,13 @@ signal ai_died(survival_time: float, score: int)
 signal ai_stats_updated(stats: Dictionary)
 signal difficulty_changed(new_difficulty: Difficulty)
 
+# 新增调试信号
+signal decision_made(direction: Vector2, reasoning: String, confidence: float, scores: Dictionary)
+signal performance_updated(metrics: Dictionary)
+signal behavior_analyzed(behavior_data: Dictionary)
+signal risk_assessed(risk_data: Dictionary)
+signal path_calculated(path_data: Dictionary)
+
 # 难度枚举
 enum Difficulty { EASY, NORMAL, HARD, EXPERT }
 
@@ -83,6 +90,7 @@ var reaction_delay: float = 0.2
 var error_rate: float = 0.1
 var is_active: bool = false
 var is_thinking: bool = false
+var look_ahead_steps: int = 3  # 添加前瞻步数变量
 
 # 性能统计
 var start_time: float = 0.0
@@ -93,6 +101,13 @@ var total_moves: int = 0
 var successful_moves: int = 0
 var last_food_time: float = 0.0  # 上次吃到食物的时间
 var hunger_level: float = 0.0    # 饥饿程度
+
+# 行为分析数据
+var behavior_data: Dictionary = {
+	"direction_preferences": {"UP": 0, "DOWN": 0, "LEFT": 0, "RIGHT": 0},
+	"last_decisions": [],
+	"decision_reasons": {}
+}
 
 # 错误处理
 var last_error_time: float = 0.0
@@ -346,11 +361,20 @@ func _on_ai_decision_made(direction: Vector2, reasoning: String) -> void:
 	is_thinking = false
 	total_moves += 1
 	
+	# 获取详细的决策信息
+	var confidence = 0.8  # 基础置信度
+	var decision_scores = {}
+	
+	if ai_brain:
+		confidence = ai_brain.decision_confidence
+		decision_scores = ai_brain.get_last_decision_scores()
+	
 	# 检查是否应该产生错误
 	var final_direction = direction
 	if _should_make_error():
 		final_direction = _generate_error_direction(direction)
 		consecutive_errors += 1
+		confidence *= 0.5  # 错误决策降低置信度
 		last_error_time = Time.get_time_dict_from_system().hour * 3600 + Time.get_time_dict_from_system().minute * 60 + Time.get_time_dict_from_system().second
 		print("AIPlayer: Made error - chose ", final_direction, " instead of ", direction)
 	else:
@@ -361,8 +385,23 @@ func _on_ai_decision_made(direction: Vector2, reasoning: String) -> void:
 	if ai_snake.has_method("set_direction"):
 		ai_snake.set_direction(final_direction)
 	
-	# 发送决策信号
+	# 发送原有决策信号
 	ai_decision_made.emit(final_direction, reasoning)
+	
+	# 发送新增的详细决策信号
+	decision_made.emit(final_direction, reasoning, confidence, decision_scores)
+	
+	# 更新和发送性能数据
+	_update_and_emit_performance_metrics()
+	
+	# 分析和发送行为数据
+	_analyze_and_emit_behavior_data(final_direction, reasoning)
+	
+	# 发送风险评估数据
+	_emit_risk_assessment_data()
+	
+	# 发送路径计算数据
+	_emit_path_calculation_data()
 	
 	# 更新统计信息
 	var stats = get_ai_stats()
@@ -462,3 +501,317 @@ func _recommend_difficulty() -> Difficulty:
 	else:
 		# 保持当前难度
 		return difficulty
+
+## 更新并发送性能指标
+func _update_and_emit_performance_metrics() -> void:
+	var current_time = Time.get_time_dict_from_system().hour * 3600 + Time.get_time_dict_from_system().minute * 60 + Time.get_time_dict_from_system().second
+	var current_survival_time = current_time - start_time if start_time > 0 else 0.0
+	
+	var metrics = {
+		"survival_time": current_survival_time,
+		"decisions_made": total_moves,
+		"food_eaten": foods_eaten,
+		"near_misses": _count_near_misses(),
+		"avg_decision_time": reaction_delay,
+		"avg_confidence": float(successful_moves) / max(1, total_moves),
+		"error_rate": float(consecutive_errors) / max(1, total_moves),
+		"food_efficiency": float(foods_eaten) / max(1, current_survival_time / 10.0)
+	}
+	
+	performance_updated.emit(metrics)
+
+## 分析并发送行为数据
+func _analyze_and_emit_behavior_data(direction: Vector2, reasoning: String) -> void:
+	# 更新方向偏好统计
+	var direction_name = _get_direction_name(direction)
+	if not behavior_data.direction_preferences.has(direction_name):
+		behavior_data.direction_preferences[direction_name] = 0
+	behavior_data.direction_preferences[direction_name] += 1
+	
+	# 更新决策历史
+	behavior_data.last_decisions.append(direction)
+	if behavior_data.last_decisions.size() > 20:
+		behavior_data.last_decisions.pop_front()
+	
+	# 分析主导策略
+	var dominant_strategy = _analyze_dominant_strategy(reasoning)
+	
+	var behavior_analysis = {
+		"direction_preferences": behavior_data.direction_preferences,
+		"recent_decisions": behavior_data.last_decisions.slice(-5),  # 最近5个决策
+		"dominant_strategy": dominant_strategy,
+		"total_moves": total_moves,
+		"decision_pattern": _analyze_decision_pattern()
+	}
+	
+	behavior_analyzed.emit(behavior_analysis)
+
+## 发送风险评估数据
+func _emit_risk_assessment_data() -> void:
+	if not ai_brain or not ai_brain.risk_analyzer:
+		return
+	
+	var risk_data = {
+		"current_risk_level": _calculate_current_risk(),
+		"immediate_threats": _identify_immediate_threats(),
+		"future_risk": _predict_future_risk(),
+		"risk_factors": _get_risk_factors(),
+		"safety_zones": _identify_safety_zones()
+	}
+	
+	risk_assessed.emit(risk_data)
+
+## 发送路径计算数据
+func _emit_path_calculation_data() -> void:
+	if not ai_brain or not ai_brain.pathfinder:
+		return
+	
+	var game_state = _get_current_game_state()
+	var food_pos = game_state.get("food_position", Vector2(-1, -1))
+	var snake_head = game_state.get("snake_head", Vector2(0, 0))
+	
+	# 尝试寻找到食物的路径
+	var path = ai_brain.pathfinder.find_path(snake_head, food_pos, game_state)
+	
+	var path_data = {
+		"has_path": path.size() > 0,
+		"path_length": path.size(),
+		"target_position": food_pos,
+		"next_direction": path[0] if path.size() > 0 else Vector2.ZERO,
+		"algorithm": "A*",
+		"path_efficiency": _calculate_path_efficiency(path),
+		"alternative_paths": _find_alternative_paths(snake_head, food_pos, game_state)
+	}
+	
+	path_calculated.emit(path_data)
+
+## 辅助方法：获取方向名称
+func _get_direction_name(direction: Vector2) -> String:
+	if direction == Vector2.UP:
+		return "UP"
+	elif direction == Vector2.DOWN:
+		return "DOWN"
+	elif direction == Vector2.LEFT:
+		return "LEFT"
+	elif direction == Vector2.RIGHT:
+		return "RIGHT"
+	else:
+		return "UNKNOWN"
+
+## 辅助方法：分析主导策略
+func _analyze_dominant_strategy(reasoning: String) -> String:
+	if "食物" in reasoning:
+		return "觅食导向"
+	elif "安全" in reasoning or "避险" in reasoning:
+		return "安全导向"
+	elif "空间" in reasoning:
+		return "空间优化"
+	elif "未来" in reasoning:
+		return "前瞻规划"
+	else:
+		return "混合策略"
+
+## 辅助方法：分析决策模式
+func _analyze_decision_pattern() -> String:
+	if behavior_data.last_decisions.size() < 3:
+		return "数据不足"
+	
+	var recent = behavior_data.last_decisions.slice(-3)
+	
+	# 检查是否在重复模式
+	if recent[0] == recent[2]:
+		return "往复模式"
+	
+	# 检查是否在螺旋模式
+	var turns = 0
+	for i in range(1, recent.size()):
+		if recent[i] != recent[i-1]:
+			turns += 1
+	
+	if turns >= 2:
+		return "转向频繁"
+	elif turns == 0:
+		return "直线前进"
+	else:
+		return "正常导航"
+
+## 辅助方法：计算当前风险
+func _calculate_current_risk() -> float:
+	if not ai_snake:
+		return 0.0
+	
+	var head_pos = ai_snake.get_head_position()
+	var grid_size = Constants.get_grid_size()
+	
+	# 计算边界风险
+	var border_risk = 0.0
+	var min_border_distance = min(
+		head_pos.x,
+		head_pos.y,
+		grid_size.x - head_pos.x - 1,
+		grid_size.y - head_pos.y - 1
+	)
+	border_risk = max(0.0, 1.0 - (min_border_distance / 3.0))
+	
+	# 计算身体碰撞风险
+	var body_risk = 0.0
+	var body_positions = ai_snake.get_body_positions()
+	for body_pos in body_positions:
+		var distance = head_pos.distance_to(body_pos)
+		if distance <= 2.0:
+			body_risk += 0.3 / max(1.0, distance)
+	
+	return min(1.0, border_risk + body_risk)
+
+## 辅助方法：识别即时威胁
+func _identify_immediate_threats() -> Array:
+	var threats = []
+	
+	if not ai_snake:
+		return threats
+	
+	var head_pos = ai_snake.get_head_position()
+	var grid_size = Constants.get_grid_size()
+	
+	# 检查边界威胁
+	if head_pos.x <= 1:
+		threats.append("左边界")
+	if head_pos.x >= grid_size.x - 2:
+		threats.append("右边界")
+	if head_pos.y <= 1:
+		threats.append("上边界")
+	if head_pos.y >= grid_size.y - 2:
+		threats.append("下边界")
+	
+	# 检查身体威胁
+	var body_positions = ai_snake.get_body_positions()
+	for body_pos in body_positions:
+		if head_pos.distance_to(body_pos) <= 1.5:
+			threats.append("蛇身碰撞")
+			break
+	
+	return threats
+
+## 辅助方法：预测未来风险
+func _predict_future_risk() -> float:
+	if not ai_brain:
+		return 0.0
+	
+	# 模拟未来几步的风险
+	var future_risk = 0.0
+	var current_pos = ai_snake.get_head_position() if ai_snake else Vector2.ZERO
+	var current_dir = ai_snake.get_direction() if ai_snake else Vector2.RIGHT
+	
+	for step in range(1, look_ahead_steps + 1):
+		current_pos += current_dir
+		var step_risk = _calculate_position_risk(current_pos)
+		future_risk += step_risk / step  # 距离越远权重越小
+	
+	return min(1.0, future_risk / look_ahead_steps)
+
+## 辅助方法：获取风险因素
+func _get_risk_factors() -> Dictionary:
+	return {
+		"hunger_level": hunger_level,
+		"consecutive_errors": consecutive_errors,
+		"time_since_food": _get_time_since_food(),
+		"space_constraint": _calculate_space_constraint()
+	}
+
+## 辅助方法：识别安全区域
+func _identify_safety_zones() -> Array:
+	var safe_zones = []
+	
+	if not ai_snake:
+		return safe_zones
+	
+	var head_pos = ai_snake.get_head_position()
+	var grid_size = Constants.get_grid_size()
+	
+	# 寻找周围的安全位置
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			var check_pos = head_pos + Vector2(dx, dy)
+			if _is_position_safe(check_pos):
+				safe_zones.append(check_pos)
+	
+	return safe_zones
+
+## 辅助方法：计算位置风险
+func _calculate_position_risk(pos: Vector2) -> float:
+	var grid_size = Constants.get_grid_size()
+	
+	# 边界风险
+	if pos.x < 0 or pos.x >= grid_size.x or pos.y < 0 or pos.y >= grid_size.y:
+		return 1.0
+	
+	# 身体碰撞风险
+	if ai_snake:
+		var body_positions = ai_snake.get_body_positions()
+		for body_pos in body_positions:
+			if pos == body_pos:
+				return 1.0
+	
+	return 0.0
+
+## 辅助方法：检查位置是否安全
+func _is_position_safe(pos: Vector2) -> bool:
+	return _calculate_position_risk(pos) < 0.3
+
+## 辅助方法：计算距离上次吃食物的时间
+func _get_time_since_food() -> float:
+	if last_food_time == 0.0:
+		return 0.0
+	
+	var current_time = Time.get_time_dict_from_system().hour * 3600 + Time.get_time_dict_from_system().minute * 60 + Time.get_time_dict_from_system().second
+	return current_time - last_food_time
+
+## 辅助方法：计算空间约束
+func _calculate_space_constraint() -> float:
+	if not ai_brain or not ai_brain.space_analyzer:
+		return 0.0
+	
+	var game_state = _get_current_game_state()
+	# 简化空间约束计算
+	var grid_size = Constants.get_grid_size()
+	var snake_length = ai_snake.get_body_positions().size() if ai_snake else 3
+	var total_space = grid_size.x * grid_size.y
+	var available_space = total_space - snake_length
+	
+	return 1.0 - (float(available_space) / float(total_space))
+
+## 辅助方法：计算路径效率
+func _calculate_path_efficiency(path: Array) -> float:
+	if path.size() == 0:
+		return 0.0
+	
+	# 计算实际路径长度与理论最短距离的比值
+	var start_pos = ai_snake.get_head_position() if ai_snake else Vector2.ZERO
+	var end_pos = path[-1] if path.size() > 0 else Vector2.ZERO
+	var manhattan_distance = abs(end_pos.x - start_pos.x) + abs(end_pos.y - start_pos.y)
+	
+	if manhattan_distance == 0:
+		return 1.0
+	
+	return float(manhattan_distance) / float(path.size())
+
+## 辅助方法：寻找替代路径
+func _find_alternative_paths(start: Vector2, target: Vector2, game_state: Dictionary) -> Array:
+	# 简化版：返回可能的替代方向
+	var alternatives = []
+	var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
+	
+	for direction in directions:
+		var next_pos = start + direction
+		if _is_position_safe(next_pos):
+			alternatives.append({
+				"direction": direction,
+				"safety_score": 1.0 - _calculate_position_risk(next_pos)
+			})
+	
+	return alternatives
+
+## 辅助方法：统计险象环生次数
+func _count_near_misses() -> int:
+	# 简化实现：基于连续错误数估算
+	return consecutive_errors * 2

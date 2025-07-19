@@ -27,6 +27,12 @@ GameSizes="*res://scripts/utils/GameSizes.gd"
 Constants="*res://scripts/utils/Constants.gd"
 CollisionDetector="*res://scripts/utils/CollisionDetector.gd"
 
+[debug]
+
+settings/default_ai_debug_enabled=true
+settings/default_ai_difficulty=3
+settings/default_game_mode="ai_battle"
+
 [display]
 
 window/size/viewport_width=800

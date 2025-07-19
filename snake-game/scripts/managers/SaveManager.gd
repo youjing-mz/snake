@@ -14,7 +14,10 @@ class SaveData:
 	var settings: Dictionary = {
 		"sound_enabled": true,
 		"music_enabled": true,
-		"difficulty": "normal"
+		"difficulty": "normal",
+		"ai_debug_enabled": true,
+		"ai_difficulty": 3,
+		"game_mode": "ai_battle"
 	}
 	var achievements: Array[String] = []
 	var last_played: String = ""
@@ -41,7 +44,10 @@ class SaveData:
 		settings = data.get("settings", {
 			"sound_enabled": true,
 			"music_enabled": true,
-			"difficulty": "normal"
+			"difficulty": "normal",
+			"ai_debug_enabled": true,
+			"ai_difficulty": 3,
+			"game_mode": "ai_battle"
 		})
 		var temp_achievements = data.get("achievements", [])
 		achievements.assign(temp_achievements.filter(func(x): return x is String))

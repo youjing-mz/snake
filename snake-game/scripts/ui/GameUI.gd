@@ -18,13 +18,25 @@ extends Control
 @onready var menu_button: Button
 @onready var continue_button: Button
 
+# 统一AI调试面板
+var ai_debug_panel: AIDebugPanel
+
 # 游戏管理器引用
 var game_manager: GameManager
 var scene_manager: SceneManager
 
+# AI系统引用
+var ai_player: AIPlayer
+var ai_debug_enabled: bool = false
+
 # UI状态
 var is_paused: bool = false
 var is_game_over: bool = false
+
+# AI调试数据
+var ai_debug_data: Dictionary = {}
+var decision_history: Array = []
+var performance_metrics: Dictionary = {}
 
 func _ready() -> void:
 	# 获取管理器引用
@@ -38,6 +50,9 @@ func _ready() -> void:
 	
 	# 初始化显示
 	_initialize_display()
+	
+	# 检查是否需要创建AI调试面板
+	_check_ai_debug_mode()
 	
 	print("GameUI initialized")
 
@@ -57,8 +72,6 @@ func _setup_ui() -> void:
 	# 查找UI节点
 	_find_ui_nodes()
 	
-
-	
 	# 验证必要的UI节点是否存在
 	if not score_label or not level_label or not speed_label or not pause_button:
 		print("Warning: Some UI nodes are missing in the scene file")
@@ -76,9 +89,108 @@ func _find_ui_nodes() -> void:
 	menu_button = find_child("MenuButton") as Button
 	continue_button = find_child("ContinueButton") as Button
 
+## 检查AI调试模式
+func _check_ai_debug_mode() -> void:
+	# 检查SaveManager中的AI调试设置
+	var save_manager = SaveManager
+	if save_manager:
+		ai_debug_enabled = save_manager.get_setting("ai_debug_enabled", false)
+		var game_mode = save_manager.get_setting("game_mode", "single_player")
+		
+		if ai_debug_enabled and game_mode == "ai_battle":
+			_create_ai_debug_panel()
 
+## 创建AI调试面板
+func _create_ai_debug_panel() -> void:
+	print("Creating unified AI debug panel")
+	
+	# 创建统一调试面板
+	ai_debug_panel = preload("res://scripts/debug/AIDebugPanel.gd").new()
+	ai_debug_panel.name = "AIDebugPanel"
+	
+	# 添加到场景
+	add_child(ai_debug_panel)
+	
+	print("Unified AI debug panel created")
 
+## 连接AI调试面板
+func _connect_ai_debug_panel():
+	if ai_debug_panel and ai_player:
+		# 设置AI玩家引用
+		ai_debug_panel.set_ai_player(ai_player)
+		
+		# 添加可视化层到游戏场景
+		var game_scene = get_tree().current_scene
+		if game_scene:
+			ai_debug_panel.add_visualization_to_scene(game_scene)
+		
+		# 连接调试设置信号
+		ai_debug_panel.debug_setting_changed.connect(_on_debug_setting_changed)
+		
+		# 默认显示调试面板
+		ai_debug_panel.show_debug_panel()
+		print("AI调试面板已显示")
+		
+		# 额外检查确保面板真的可见
+		call_deferred("_verify_debug_panel_visibility")
 
+## 设置AI玩家引用
+func set_ai_player(player: AIPlayer) -> void:
+	ai_player = player
+	
+	# 重新检查调试设置
+	var save_manager = SaveManager
+	if save_manager:
+		ai_debug_enabled = save_manager.get_setting("ai_debug_enabled", false)
+		var game_mode = save_manager.get_setting("game_mode", "single_player")
+		
+		print("GameUI: AI Debug enabled: ", ai_debug_enabled, ", Game mode: ", game_mode)
+		
+		if ai_debug_enabled and game_mode == "ai_battle":
+			# 如果还没有创建调试面板，先创建
+			if not ai_debug_panel:
+				_create_ai_debug_panel()
+			
+			# 连接AI调试面板
+			if ai_player:
+				_connect_ai_debug_panel()
+
+## 验证调试面板可见性
+func _verify_debug_panel_visibility():
+	if ai_debug_panel:
+		print("调试面板验证:")
+		print("  • 存在: ", ai_debug_panel != null)
+		print("  • 可见: ", ai_debug_panel.visible)
+		print("  • 调试状态: ", ai_debug_panel.show_debug)
+		print("  • 位置: ", ai_debug_panel.position)
+		print("  • 大小: ", ai_debug_panel.size)
+		print("  • Z索引: ", ai_debug_panel.z_index)
+		print("  • 父节点: ", ai_debug_panel.get_parent().name if ai_debug_panel.get_parent() else "null")
+		
+		# 如果不可见，强制显示
+		if not ai_debug_panel.visible:
+			ai_debug_panel.show_debug_panel()
+			print("强制显示调试面板")
+
+## 处理调试设置变化
+func _on_debug_setting_changed(setting_name: String, value: bool):
+	print("Debug setting changed: %s = %s" % [setting_name, value])
+	
+	# 处理特定的调试设置
+	if setting_name == "show_thinking" and ai_debug_panel:
+		# "显示思考过程"控制整个调试面板的显示
+		if value:
+			ai_debug_panel.show_debug_panel()
+			print("通过思考过程开关显示调试面板")
+		else:
+			ai_debug_panel.hide_debug_panel()
+			print("通过思考过程开关隐藏调试面板")
+	elif setting_name == "auto_pause" and value:
+		# 启用自动暂停逻辑
+		pass
+	elif setting_name == "step_execute":
+		# 执行单步操作
+		pass
 
 
 
@@ -265,6 +377,12 @@ func _input(event: InputEvent) -> void:
 			_on_restart_button_pressed()
 		elif event.is_action_pressed("cancel"):
 			_on_menu_button_pressed()
+	
+	# AI调试快捷键
+	if ai_debug_enabled and event.is_action_pressed("ui_home"):
+		# 切换AI调试面板可见性
+		if ai_debug_panel:
+			ai_debug_panel.visible = not ai_debug_panel.visible
 
 ## 更新分数（外部调用）
 func update_score(score: int) -> void:
@@ -280,15 +398,29 @@ func update_speed_display() -> void:
 		_update_speed_display(game_manager.get_speed())
 
 ## 重置UI状态
-func reset_ui() -> void:
+func reset() -> void:
+	# 重置基本UI状态
+	is_paused = false
+	is_game_over = false
+	
+	# 隐藏面板
 	_hide_pause_panel()
 	_hide_game_over_panel()
-	_initialize_display()
+	
+	# 重置AI调试数据
+	if ai_debug_enabled:
+		decision_history.clear()
+		performance_metrics.clear()
+		ai_debug_data.clear()
+		
+			# 重置调试面板显示
+	if ai_debug_panel:
+		ai_debug_panel.reset_metrics()
+	
 	print("GameUI reset")
 
-## 获取UI状态
-func get_ui_state() -> Dictionary:
-	return {
-		"is_paused": is_paused,
-		"is_game_over": is_game_over
-	}
+## 公共接口：启用/禁用AI调试面板
+func toggle_ai_debug_panel(enabled: bool) -> void:
+	if ai_debug_panel:
+		ai_debug_panel.visible = enabled
+		ai_debug_enabled = enabled
